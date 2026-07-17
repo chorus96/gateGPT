@@ -476,3 +476,164 @@ else if (sb_cnt >= FILTER) sb_clean <= sb_sync[1];   // 안정 후 채택
 | 컴파일러 지시자 (`include`/`ifdef`) | `microgpt_core`, `xupv5_microgpt_top` |
 | 테스트벤치 (`initial`/`task`/`$readmemh`/`$display`) | `sim/tb_*.v` 전반 |
 | Xilinx 프리미티브 (`DCM_BASE`/`BUFG`) | `xupv5_microgpt_top` |
+
+---
+
+# 14. Verilog 기반 알고리즘 상세
+
+이 장은 저장소의 RTL이 **하드웨어로 구현한 알고리즘**을 파일별로 상세히 정리합니다. 각 알고리즘의
+동작 원리, 상태 흐름, 사이클 복잡도, 핵심 최적화를 포함합니다. (개념적 수식은 `math.kr.md` 참조)
+
+## 14.1 마이크로코드 시퀀서 (`microgpt_core.v`)
+
+**알고리즘**: 프로그램 카운터(`pc`)가 조합 ROM 함수 `ucode_rom(pc)`에서 72비트 매크로 명령을 페치 →
+필드를 디코드해 해당 액추에이터에 `go` 펄스 → `act_done`을 기다렸다가 `pc++` → 반복. `OP_HALT`에서 종료.
+
+- **3-상태 FSM**: `Q_IDLE`(start 대기) → `Q_EXEC`(op별 go 펄스) → `Q_WAIT`(완료 대기, pc 증가).
+- **핸드셰이크**: 시퀀서와 액추에이터가 start/done으로 동기화 → 각 매크로 연산이 가변 사이클을 가져도 안전.
+- **KV 캐시 슬롯 주소**: `use_pos`면 목적지에 `pos_r * N_EMBED`를 더해 캐시 위치에 K/V 기록.
+- 17개 명령이 한 토큰의 전체 트랜스포머 스케줄(embed → norm → K/V/Q matvec → attn → wo →
+  잔차 → norm → fc1 → relu → fc2 → 잔차 → norm → lm → sample)을 인코딩.
+
+## 14.2 타일드 병렬 행렬-벡터 (`matvec.v`)
+
+**알고리즘**: 출력 행을 LANES=24개 단위 타일로 나누고, 각 타일을 systolic MAC로 계산:
+
+1. **S_RUN**: 매 사이클 활성값 2개(`act[2j]`, `act[2j+1]`)를 듀얼 포트로 읽고, 와이드 ROM에서
+   두 열의 24개 가중치를 받아 **레인당 2 MAC** → 타일이 `in_dim/2` 사이클에 완료.
+2. **S_DRAIN**: 2단 오퍼랜드 파이프라인의 잔여 열 쌍을 플러시.
+3. **S_WB**: 누산기를 `>>> descale` 후 포화, 두 쓰기 포트로 **2행/사이클** 배출 → `LANES/2` 사이클.
+4. 다음 타일로 `obase`/`wbase` 전진, 마지막 타일에서 종료.
+
+- **최적화**: 2단 오퍼랜드 파이프(`w_rdata_rr`, `rd_a_r`)로 BRAM→DSP 넷을 크리티컬 패스에서 제거.
+- **복잡도**: 타일당 ≈ `in_dim/2 + LANES/2` 사이클. 48개 DSP48E 사용(바인딩 리소스).
+
+## 14.3 RMSNorm 엔진 (`norm.v`)
+
+**알고리즘**: 6-상태 FSM으로 정규화를 순차 계산.
+
+1. **S_SUM/S_SUMD**: 듀얼 포트로 2원소/사이클 읽어 제곱합 `ss` 누산 + `xreg`에 캐시.
+2. **S_DIV1**: 공유 `udiv`로 `ss / N` (평균 제곱).
+3. **S_SQRT**: `isqrt`로 $\lfloor\sqrt{\text{mean\_sq}}\rfloor = r$.
+4. **S_DIV2**: `udiv`로 `2^22 / r` → 역제곱근 스케일 `scale_q`(32767 클램프).
+5. **S_SCALE**: 2단 파이프로 `y = sat16(sat16(x·scale>>F)·gain>>F)`, 2원소/사이클 쓰기.
+
+- **자원 공유**: 하나의 `udiv`를 두 나눗셈에 재사용, `isqrt`는 좁은 32비트.
+- **복잡도**: 약 `N/2`(합) + 나눗셈/제곱근 지연 + `N/2`(스케일) 사이클.
+
+## 14.4 단일 위치 멀티헤드 어텐션 (`attn.v`)
+
+**알고리즘**: 헤드마다 8-페이즈 FSM을 순회.
+
+1. **P_QLOAD**: 쿼리 슬라이스를 `qreg`에 로드(read-ahead).
+2. **P_SCORE**: `q·k` 닷프로덕트(2단 파이프: `dot_raw` 등록 후 scale+max 비교) → `score[t]`, 최댓값.
+3. **P_EXP**: `exp_unit`으로 `exp(score-max)` → `ev[t]`, 합 `sum_e` 누산.
+4. **P_WSUM**: 성분별 분자 `Σ(e·v)`를 `num[d]`에 누산(s를 컨텍스트에 걸쳐 스윕).
+5. **P_WDIV**: HEAD_DIM개 `udiv`를 **동시 발사**(공유 `d_start`) → 헤드당 나눗셈 지연 1회.
+6. **P_WWB**: 결과를 `o_base`에 기록 → **P_NEXTH**로 다음 헤드.
+
+- **핵심 최적화**: 한 헤드의 6개 출력이 같은 분모를 공유하므로 병렬 나눗셈으로 처리(스테이지 4, 44,919 tok/s).
+- **read-ahead**: 지연 인덱스(`s_d`, `d_d`)로 등록 읽기의 1사이클 지연을 정렬.
+
+## 14.5 고정소수점 지수 (`exp_unit.v`)
+
+**알고리즘**: 파이프라인(지연 1) 테이블 + 선형 보간.
+
+1. **스테이지 1(조합)**: `|z|`에서 정수부 `ui`, 소수부 `uf` 추출, `exp_tab_rom(ui)`/`(ui+1)` 조회.
+2. **파이프 레지스터**: `lo_r`, `hi_r`, `uf_r`, `pos_r`, `big_r`로 컷.
+3. **스테이지 2(조합)**: `interp = lo + (hi-lo)·uf >>> 11`, 특수값(z≥0→2048, ui≥16→0) 클램프.
+
+- 감소 함수 테이블(17항목)에 구간 선형 보간 → 곱셈 1회. 파이프 컷으로 Fmax 개선.
+
+## 14.6 정수 제곱근 (`isqrt.v`)
+
+**알고리즘**: 비트-페어(비복원) 제곱근, W/2 사이클.
+
+- 4의 거듭제곱 비트마스크 `bitm`을 상위부터 내려가며, 매 사이클 `res+bitm`과 `op` 비교:
+  크면 `op -= res+bitm`, `res = (res>>1)+bitm`; 작으면 `res >>= 1`. `bitm >>= 2`.
+- 마지막 사이클에서 최종 $\lfloor\sqrt{\cdot}\rfloor$을 `root`에 노출. Python `math.isqrt`와 비트 일치.
+
+## 14.7 Radix-4 정수 나눗셈 (`udiv.v`)
+
+**알고리즘**: 복원 나눗셈, MSB 우선, **사이클당 몫 2비트**, W/2 사이클.
+
+- 매 사이클 부분 나머지를 4배 시프트하고 피제수 상위 2비트를 내려받음.
+- `d1=den`, `d2=2den`, `d3=3den`을 미리 계산해 `rshift`와 비교, 몫 자릿수 `qd∈{0,1,2,3}` 결정.
+- `rem = rshift - qd·den`, `q = {q, qd}`. `den=0`이면 all-ones 가드.
+- radix-2와 **비트 동일한** floor 몫·나머지를 절반 사이클에 산출(스테이지 5, 51,914 tok/s). 나머지는 샘플러 모듈로에 재사용.
+
+## 14.8 토큰 샘플러 (`sampler.v`)
+
+**알고리즘**: 5-상태 FSM, 그리디 또는 온도 softmax 범주형.
+
+1. **S_SCALE**: logit을 등록 후 `·inv_temp>>F`로 온도 스케일, `scaled[]`·최댓값 계산, 동시에 그리디 argmax 추적.
+2. (그리디면 argmax 토큰으로 종료.)
+3. **S_EXP**: `exp(scaled-max)` → `ev[]`, 총합 `total`. LCG로 난수 `rngs` 진행.
+4. **S_MOD**: `udiv`의 **나머지**로 `rngs mod total = rval`(별도 곱셈 불필요).
+5. **S_PICK**: 누적합이 처음 `rval`을 초과하는 토큰 선택(역-CDF 샘플링).
+
+- **LCG**: `rng·1664525 + 1013904223`. 결정론적 → 소프트웨어 골든과 비트 일치.
+
+## 14.9 임베딩 조회 (`embed.v`)
+
+**알고리즘**: `tbase=token·N_EMBED`, `pbase=pos·N_EMBED`로 두 ROM을 인덱싱해
+`sat16(tok_emb + pos_emb)`를 `dst_base+i`에 순차 기록(N_EMBED 사이클). 조합 case 함수 ROM 사용.
+
+## 14.10 원소별 벡터 연산 (`vecop.v`)
+
+**알고리즘**:
+- **ADD**: `S_LOADA`에서 벡터 a를 `areg` 캐시에 읽어들인 뒤(read-ahead), `S_COMB`에서 b를
+  스트리밍하며 `sat16(a+b)` 기록(잔차 덧셈).
+- **RELU**: 캐시 생략, `S_COMB`에서 a를 스트리밍하며 `v_rdata[15] ? 0 : v_rdata` 기록.
+
+## 14.11 듀얼 포트 스크래치패드 접근 (`vmem.v`, `vmem2.v`)
+
+**알고리즘**: 등록 읽기 BRAM. `vmem`은 1읽기+1쓰기, `vmem2`는 진정한 듀얼 포트(포트당 독립 always).
+액추에이터가 주소를 한 사이클 먼저 제시하고 다음 사이클 데이터 소비(read-ahead) → 2읽기 또는 2쓰기/사이클.
+
+## 14.12 자기회귀 이름 생성 루프 (`name_generator.v`)
+
+**알고리즘**: 4-상태 FSM(`G_IDLE`/`G_FIRE`/`G_WAIT`/`G_DONE`).
+
+- 각 반복: `cur_token`/`pos`/`rng`를 코어에 넘겨 `core_start` 펄스 → `core_done` 대기 →
+  결과 토큰을 다음 입력으로 피드백, `pos++`, `rng=core_rng`.
+- 구분자(0) 또는 `pos==MAX_LEN-1`에서 종료. `name_buf`에 `token-1`을 저장(표시 매핑).
+
+## 14.13 HD44780 LCD 컨트롤러 (`lcd_hd44780.v`)
+
+**알고리즘**: 이중 FSM.
+
+- **메인 페이즈 FSM**: POWERON(~40ms) → INIT(8-op 초기화) → LATCH(라인 스냅샷) →
+  ADDR1/CHARS1(1행) → ADDR2/CHARS2(2행) → LATCH 반복(연속 재드로).
+- **바이트 전송 서브-FSM**: 각 바이트를 상위/하위 니블로 나눠 각 니블마다 setup(tAS) → E high → settle.
+  `is_nibble`이면 상위 니블만(8→4비트 전환).
+- **tear-free**: 프레임 시작 시 `l1_buf`/`l2_buf`로 스냅샷. 모든 지연은 `CLK_HZ` 파생(실시간).
+
+## 14.14 로터리 쿼드러처 디코드 + 디바운스 (`rotary_throttle.v`)
+
+**알고리즘**:
+- **동기화+디글리치**: 비동기 A/B/push를 2-FF 동기화 후 카운터로 안정화(FILTER 사이클).
+- **쿼드러처 디코드**: 상태 전이 `tr={ab_d, ab}`로 up/dn 엣지 판정, `acc`에 부호 있는 엣지 누산,
+  `EDGES_PER_DETENT=4`마다 한 디텐트로 설정값(±1) 변경.
+- **모드 토글**: 디바운스된 push 상승 엣지로 `cfg_mode`(RATE/TEMP) 전환.
+- **지수적 간격**: `interval = CLK_HZ >> speed_level`, `timer`가 만료되고 코어가 idle이면 `auto_start` 펄스.
+- **스타트업 홀드오프**: `STARTUP_HOLD`(~200ms) 동안 무장 해제.
+
+## 14.15 BCD 초당 토큰 미터 (`tok_meter.v`)
+
+**알고리즘**: 이진→십진 나눗셈 없이 처음부터 BCD 리플 캐리로 계수.
+
+- `token_valid`마다 `d0`++, 9에서 넘치면 상위 자릿수로 캐리 전파(`d0→d1→d2→d3→d4`).
+- `at_cap`(99999)에서 포화. `sec_timer`가 `CLK_HZ-1`에 도달하면 `tok_bcd`에 5자리 발행 후 리셋.
+
+## 14.16 클럭 합성·리셋·버튼 디바운스 (`xupv5_microgpt_top.v`)
+
+**알고리즘**:
+- **DCM 클럭 합성**: `DCM_BASE`의 CLKFX(×4/5)로 100 MHz → 80 MHz, CLK0 피드백으로 deskew/lock.
+- **리셋 디바운스**: `rst_btn`을 2-FF 동기화 후 `RST_FILTER`(~2ms) 안정 시 동기 리셋 갱신,
+  DCM lock까지 리셋 유지.
+- **버튼 디바운스**: `start_btn`을 같은 방식으로 걸러 상승 엣지 펄스 생성(단, 이 보드에선 트리거로 미사용).
+- **1 Hz 하트비트**: 카운터로 0.5초마다 토글해 `led[7]`에 클럭 검증 표시.
+
+---
+
