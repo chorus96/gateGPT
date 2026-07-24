@@ -16,9 +16,12 @@
 #      block design that instantiates zynq_ultra_ps_e and connects pl_clk0 -> clk_100
 #      (a helper is sketched at the bottom of this file). This project-mode script
 #      builds the PL logic standalone (synth checks out; clk_100 is a create_clock net).
-#   2. Peripherals: Kria SOMs have no onboard switches/LEDs/LCD/rotary. Assign the
-#      <FILL_ME> LOCs in board/kr260_microgpt.xdc to the KR260 Pmod / Raspberry Pi
-#      40-pin header pins you wire to (from the AMD KR260 master XDC) before implementation.
+#   2. Peripherals: Kria SOMs have no onboard switches/LEDs/LCD/rotary. All 28 of
+#      this design's signals are pre-assigned in board/kr260_microgpt.xdc to the
+#      KR260 Raspberry Pi 40-pin GPIO header IN PHYSICAL-PIN ORDER (annotated with
+#      each RPi pin # and BCM GPIO name). Only the PACKAGE_PIN balls are left as the
+#      <BALL> placeholder -- replace each with the xck26-sfvc784 ball the AMD KR260
+#      master XDC gives for that RPi pin, then uncomment, before implementation.
 #
 #  Replaces the ISE flow (build_board_ise_project.tcl / run_board_bitgen.tcl / *.ucf).
 # ============================================================================
