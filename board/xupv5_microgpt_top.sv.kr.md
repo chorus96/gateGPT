@@ -59,6 +59,6 @@ flowchart TB
 
 ## RTL과의 관계
 보드 최상위로, 코어(`name_generator`→`microgpt_core`)와 주변장치(로터리/LCD/미터/MMCM)를 통합.
-Vivado 빌드는 `build_board_vivado_project.tcl` + `board/kria_k26_microgpt.xdc`(Kria K26, Zynq
+Vivado 빌드는 `build_board_vivado_project.tcl` + `board/kr260_microgpt.xdc`(Kria K26, Zynq
 UltraScale+). Kria는 PL 오실레이터 핀이 없어 `clk_100`은 PS `pl_clk0`에서 공급되며, 온보드
-스위치/LED/LCD/로터리가 없으므로 캐리어(KV260/KR260) Pmod/확장에 핀을 매핑해야 함.
+스위치/LED/LCD/로터리가 없으므로 캐리어(KR260) Pmod/확장에 핀을 매핑해야 함.

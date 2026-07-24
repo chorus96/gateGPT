@@ -222,9 +222,9 @@ make -C sim lint       # -Wall static lint (clean)
 
 Build the board bitstream with **Vivado 24.2**. The RTL is now SystemVerilog and the
 original Virtex-5 target is not supported by Vivado, so the board flow is **retargeted to a
-Kria K26 SOM** (Zynq UltraScale+ MPSoC, `xck26-sfvc784-2LV-c`; KV260/KR260 carrier); the
+Kria K26 SOM** (Zynq UltraScale+ MPSoC, `xck26-sfvc784-2LV-c`; KR260 carrier); the
 Virtex-5 `DCM_BASE` becomes an `MMCME4_BASE` (100 MHz → 80 MHz) and the ISE `.ucf` becomes
-`board/kria_k26_microgpt.xdc`:
+`board/kr260_microgpt.xdc`:
 
 ```bash
 vivado -mode batch -source build_board_vivado_project.tcl            # synth + impl + bitstream

@@ -2,7 +2,7 @@
 #  Vivado 24.2 project build for gateGPT (board top: core + name_generator + LCD +
 #  rotary + tok/s meter + MMCME4 clocking).
 #
-#  Device: xck26-sfvc784-2LV-c  (Kria K26 SOM, Zynq UltraScale+ MPSoC; KV260/KR260).
+#  Device: xck26-sfvc784-2LV-c  (Kria K26 SOM, Zynq UltraScale+ MPSoC; KR260 carrier).
 #  Top:    xupv5_microgpt_top    (retargeted from Virtex-5/ISE; Vivado has no Virtex-5).
 #
 #  Usage:
@@ -17,8 +17,8 @@
 #      (a helper is sketched at the bottom of this file). This project-mode script
 #      builds the PL logic standalone (synth checks out; clk_100 is a create_clock net).
 #   2. Peripherals: Kria SOMs have no onboard switches/LEDs/LCD/rotary. Assign the
-#      <FILL_ME> LOCs in board/kria_k26_microgpt.xdc to your carrier's PMOD/expansion
-#      pins before implementation.
+#      <FILL_ME> LOCs in board/kr260_microgpt.xdc to the KR260 Pmod / Raspberry Pi
+#      40-pin header pins you wire to (from the AMD KR260 master XDC) before implementation.
 #
 #  Replaces the ISE flow (build_board_ise_project.tcl / run_board_bitgen.tcl / *.ucf).
 # ============================================================================
@@ -29,8 +29,9 @@ set top  xupv5_microgpt_top
 set prj  $root/vivado_prj
 
 create_project -force gategpt $prj -part $part
-# Kria board part (optional, if the board files are installed):
-# set_property board_part xilinx.com:kv260_som:part0:1.4 [current_project]
+# Kria KR260 board part (optional, if the KR260 board files are installed; adjust the
+# version suffix to the one you have, e.g. via `get_board_parts *kr260*`):
+# set_property board_part xilinx.com:kr260_som:part0:1.1 [current_project]
 
 # --- RTL sources (SystemVerilog) ---
 # NOTE: sim/xilinx_stubs.sv is intentionally NOT added -- Vivado uses the real UNISIM
@@ -42,7 +43,7 @@ set_property include_dirs $root/core [get_filesets sources_1]
 set_property top $top [current_fileset]
 
 # --- constraints ---
-add_files -fileset constrs_1 -norecurse $root/board/kria_k26_microgpt.xdc
+add_files -fileset constrs_1 -norecurse $root/board/kr260_microgpt.xdc
 
 # --- optional ChipScope/ILA VIO macro (off by default; standalone LCD demo) ---
 # set_property verilog_define {CHIPSCOPE_VIO} [current_fileset]
@@ -64,7 +65,7 @@ if {[lsearch -exact $argv "noflow"] >= 0} {
 
 # ---------------------------------------------------------------------------
 #  OPTIONAL Kria block-design sketch (clk_100 from PS pl_clk0). Uncomment and run
-#  in place of the project flow above once you have the KV260/KR260 board part.
+#  in place of the project flow above once you have the KR260 board part.
 # ---------------------------------------------------------------------------
 # create_bd_design "gategpt_bd"
 # set ps [create_bd_cell -type ip -vlnv xilinx.com:ip:zynq_ultra_ps_e ps]

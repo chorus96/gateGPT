@@ -156,7 +156,7 @@ TOP PASS: board booted (MMCM locked, LCD driving) and generated a name
 ## 합성 흐름과의 관계
 
 RTL이 SystemVerilog로 이관되면서 원래의 ISE 14.7(iSim) 흐름은 폐기되었고, 합성은 **Vivado 24.2**로
-전환되었습니다. Vivado는 Virtex-5를 지원하지 않아 보드는 **Kria K26(xck26, KV260)**로
-리타깃되었습니다 — `DCM_BASE` → `MMCME4_BASE`, `.ucf` → `board/kria_k26_microgpt.xdc`, ISE tcl →
+전환되었습니다. Vivado는 Virtex-5를 지원하지 않아 보드는 **Kria K26(xck26, KR260)**로
+리타깃되었습니다 — `DCM_BASE` → `MMCME4_BASE`, `.ucf` → `board/kr260_microgpt.xdc`, ISE tcl →
 `build_board_vivado_project.tcl`. Verilator는 그 합성 RTL을 오픈소스 도구만으로 골든 검증하는
 경로이며, `sim/xilinx_stubs.sv`가 Vivado 프리미티브를 대체합니다.
