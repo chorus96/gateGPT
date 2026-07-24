@@ -1,19 +1,17 @@
-// Independent microGPT inference core: a microcode-ROM sequencer driving modular
-// datapath actuators. The program ROM (generated/ucode.hex) holds the schedule as
-// macro-ops; the sequencer fetches one per step, starts the matching actuator, waits
-// for done. INCREMENTAL decoding with a persistent KV cache: each call processes ONE
-// new token at position pos_in (token_in), writing its K/V into the cache slot KC[pos]/
-// VC[pos] (use_pos), and attends over positions 0..pos_in. The KC/VC cache lives in
-// vmem and survives across calls. Bit-exact with tools/fixedpoint.QModel.logits_last.
-// (SystemVerilog)
+// 독립적인 microGPT 추론 코어: 모듈형 데이터패스 액추에이터를 구동하는 마이크로코드-ROM
+// 시퀀서. 프로그램 ROM(generated/ucode.hex)이 스케줄을 매크로 연산으로 담음; 시퀀서는
+// 매 스텝마다 하나를 페치하여 해당 액추에이터를 시작하고 done을 기다림. 영속적 KV 캐시를
+// 사용하는 증분 디코딩: 각 호출은 위치 pos_in의 새 토큰 하나(token_in)를 처리하여, 그 K/V를
+// 캐시 슬롯 KC[pos]/VC[pos]에 쓰고(use_pos) 위치 0..pos_in에 어텐션함. KC/VC 캐시는 vmem에
+// 있고 호출들에 걸쳐 유지됨. tools/fixedpoint.QModel.logits_last 와 비트 일치. (SystemVerilog)
 module microgpt_core (
     input  logic        clk,
     input  logic        resetn,
     input  logic        start,
-    input  logic [4:0]  token_in,             // new token at this position
-    input  logic [4:0]  pos_in,               // absolute position (0..BLOCK-1)
+    input  logic [4:0]  token_in,             // 이 위치의 새 토큰
+    input  logic [4:0]  pos_in,               // 절대 위치 (0..BLOCK-1)
     input  logic        sample_mode,
-    input  logic signed [15:0] inv_temp,      // (1/temperature) in Q5.11
+    input  logic signed [15:0] inv_temp,      // (1/temperature), Q5.11
     input  logic [31:0] rng_in,
     output logic        busy,
     output logic        done,
@@ -23,10 +21,10 @@ module microgpt_core (
 `include "core_params.vh"
 `include "coremap.vh"
 
-    // ---------------- program ROM (combinational case) + fetch/decode ----------------
-    // The microcode is a combinational function, NOT a $readmemh distributed ROM: XST 14.7
-    // ties small $readmemh ROM arrays to zero, which left the program all-NOP on the board
-    // (the sequencer never reached HALT -> the core hung). See core/ucode_rom.vh.
+    // ---------------- 프로그램 ROM (조합 case) + 페치/디코드 ----------------
+    // 마이크로코드는 조합 함수이며 $readmemh 분산 ROM이 아님: XST 14.7은 작은 $readmemh
+    // ROM 배열을 0으로 묶어 보드에서 프로그램을 전부 NOP로 만들었음(시퀀서가 HALT에
+    // 도달하지 못해 코어가 멈춤). core/ucode_rom.vh 참조.
 `include "ucode_rom.vh"
     logic [7:0]  pc;
     wire [71:0] instr   = ucode_rom(pc);
@@ -41,14 +39,14 @@ module microgpt_core (
     wire [9:0]  d_base  = instr[64:55];
     wire        use_pos = instr[66];
 
-    // latched per-token inputs
+    // 토큰별로 래치된 입력
     logic [4:0] tok_r, pos_r;
-    wire [9:0] pos_off = pos_r * N_EMBED;                    // cache slot offset
+    wire [9:0] pos_off = pos_r * N_EMBED;                    // 캐시 슬롯 오프셋
     wire [9:0] mv_dst  = use_pos ? (d_base + pos_off) : d_base;
 
-    // ---------------- shared vmem (true dual-port) ----------------
-    // port A is the primary read (rdata=v_rdata) and norm's 2nd write; port B is the
-    // primary write and norm's 2nd read (rdata=v_rdata_b).
+    // ---------------- 공유 vmem (진정한 듀얼 포트) ----------------
+    // 포트 A는 주 읽기(rdata=v_rdata)이자 norm의 2번째 쓰기; 포트 B는 주 쓰기이자
+    // norm의 2번째 읽기(rdata=v_rdata_b).
     wire [9:0]  pa_addr, pb_addr;
     wire        pa_we, pb_we;
     wire signed [15:0] pa_wd, pb_wd, v_rdata, v_rdata_b;
@@ -56,7 +54,7 @@ module microgpt_core (
         .we_a(pa_we), .addr_a(pa_addr), .wdata_a(pa_wd), .rdata_a(v_rdata),
         .we_b(pb_we), .addr_b(pb_addr), .wdata_b(pb_wd), .rdata_b(v_rdata_b));
 
-    // ---------------- actuators ----------------
+    // ---------------- 액추에이터 ----------------
     logic em_go, no_go, mv_go, at_go, vo_go, sp_go;
     wire em_we; wire [9:0] em_wa; wire signed [15:0] em_wd; wire em_busy, em_done;
     embed #(.N_EMBED(N_EMBED)) u_embed (.clk(clk), .resetn(resetn), .start(em_go),
@@ -77,7 +75,7 @@ module microgpt_core (
 
     wire [9:0] mv_aa, mv_ab; wire mv_wea, mv_web; wire signed [15:0] mv_wda, mv_wdb;
     wire mv_busy, mv_done;
-    wire [11:0] w_addr; wire [768-1:0] w_rdata;   // 24 lanes x 16-bit x 2 columns/cycle
+    wire [11:0] w_addr; wire [768-1:0] w_rdata;   // 24 레인 x 16비트 x 2 열/사이클
     matvec u_mv (.clk(clk), .resetn(resetn), .start(mv_go),
         .wsel(wsel[2:0]), .in_dim(in_dim), .out_dim(out_dim),
         .act_base(a_base), .dst_base(mv_dst), .descale(descale),
@@ -106,15 +104,15 @@ module microgpt_core (
         .v_raddr(sp_ra), .v_rdata(v_rdata), .token(sp_tok), .rng_out(sp_rng),
         .busy(sp_busy), .done(sp_done));
 
-    // ---------------- vmem dual-port mux (active actuator) ----------------
-    // port A: primary read for every actuator (norm/matvec also write on it)
+    // ---------------- vmem 듀얼 포트 먹스 (활성 액추에이터) ----------------
+    // 포트 A: 모든 액추에이터의 주 읽기 (norm/matvec은 여기에 쓰기도 함)
     assign pa_addr =
         (op == OP_NORM) ? no_aa : (op == OP_MATV) ? mv_aa :
         (op == OP_ATTN) ? at_ra : (op == OP_VADD || op == OP_RELU) ? vo_ra :
         (op == OP_SAMPLE) ? sp_ra : 10'd0;
     assign pa_we = (op == OP_NORM) ? no_wea : (op == OP_MATV) ? mv_wea : 1'b0;
     assign pa_wd = (op == OP_MATV) ? mv_wda : no_wda;
-    // port B: primary write for every actuator (norm/matvec also read on it)
+    // 포트 B: 모든 액추에이터의 주 쓰기 (norm/matvec은 여기서 읽기도 함)
     assign pb_addr =
         (op == OP_NORM) ? no_ab : (op == OP_MATV) ? mv_ab : (op == OP_EMBED) ? em_wa :
         (op == OP_ATTN) ? at_wa : (op == OP_VADD || op == OP_RELU) ? vo_wa : 10'd0;
@@ -130,7 +128,7 @@ module microgpt_core (
         (op == OP_ATTN) ? at_done : (op == OP_VADD || op == OP_RELU) ? vo_done :
         (op == OP_SAMPLE) ? sp_done : 1'b1;
 
-    // ---------------- sequencer ----------------
+    // ---------------- 시퀀서 ----------------
     typedef enum logic [1:0] { Q_IDLE, Q_EXEC, Q_WAIT } qstate_t;
     qstate_t q;
     always_ff @(posedge clk) begin

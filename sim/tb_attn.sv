@@ -1,4 +1,4 @@
-// Unit test for the attention engine vs the Python reference.
+// Python 레퍼런스 대비 어텐션 엔진의 유닛 테스트.
 `timescale 1ns/1ps
 module tb_attn;
     localparam N = 24, KV = 16*24;

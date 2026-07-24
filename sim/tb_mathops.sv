@@ -1,4 +1,4 @@
-// Unit test for udiv and isqrt against the Python reference values.
+// Python 레퍼런스 값 대비 udiv와 isqrt의 유닛 테스트.
 `timescale 1ns/1ps
 module tb_mathops;
     reg clk = 0, resetn = 0;

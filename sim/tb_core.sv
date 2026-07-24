@@ -1,6 +1,5 @@
-// End-to-end core test: run the incremental generation loop (one token per core call
-// at a growing absolute position, with the persistent KV cache) and compare the token
-// sequence to the Python golden (greedy and sampled).
+// 엔드투엔드 코어 테스트: 증분 생성 루프(성장하는 절대 위치에서 코어 호출당 한 토큰,
+// 영속적 KV 캐시)를 실행하고, 토큰 시퀀스를 Python 골든(그리디 및 샘플)과 비교.
 `timescale 1ns/1ps
 module tb_core;
     reg clk = 0, resetn = 0, start = 0;
@@ -23,7 +22,7 @@ module tb_core;
     reg [4:0] seq [0:15];
     integer   slen;
 
-    // measure cycles per token (core start -> done)
+    // 토큰당 사이클 측정 (코어 start -> done)
     integer cyc = 0; reg counting = 0; integer reported = 0;
     integer tot_cyc = 0, tot_tok = 0;
     always @(posedge clk) begin
@@ -40,7 +39,7 @@ module tb_core;
         $display("AVG_CYCLES = %0d over %0d tokens (last=%0d)", tot_cyc / tot_tok, tot_tok, cyc);
     end
 
-    // expected sequences (absolute-position model): greedy "alaya", sampled "rosphod"
+    // 기대 시퀀스 (절대 위치 모델): 그리디 "alaya", 샘플 "rosphod"
     reg [4:0] exp_greedy [0:4];
     reg [4:0] exp_samp   [0:6];
 
@@ -50,10 +49,10 @@ module tb_core;
             for (step = 0; step < 16; step = step + 1) begin
                 @(negedge clk); start = 1; @(negedge clk); start = 0;
                 wait (done); @(posedge clk); #1;
-                if (next_token == 0) step = 100;          // stop on delimiter
+                if (next_token == 0) step = 100;          // 구분자에서 정지
                 else begin
                     seq[slen] = next_token; slen = slen + 1;
-                    token_in = next_token; pos_in = pos_in + 1;   // advance position
+                    token_in = next_token; pos_in = pos_in + 1;   // 위치 전진
                     rng_in = rng_out;
                 end
             end
@@ -67,13 +66,13 @@ module tb_core;
         errors = 0;
         repeat (6) @(posedge clk); resetn = 1; @(posedge clk);
 
-        run_gen(1'b0, 32'd0, 16'sd0);     // greedy
+        run_gen(1'b0, 32'd0, 16'sd0);     // 그리디
         $write("greedy tokens:"); for (k=0;k<slen;k=k+1) $write(" %0d", seq[k]); $write("\n");
         if (slen != 5) begin $display("GREEDY LEN FAIL %0d", slen); errors=errors+1; end
         else for (k=0;k<5;k=k+1) if (seq[k]!==exp_greedy[k]) begin
             $display("GREEDY MISMATCH %0d got %0d exp %0d", k, seq[k], exp_greedy[k]); errors=errors+1; end
 
-        run_gen(1'b1, 32'd2, 16'sd2926);  // sampled seed=2 T=0.7
+        run_gen(1'b1, 32'd2, 16'sd2926);  // 샘플 seed=2 T=0.7
         $write("sampled tokens:"); for (k=0;k<slen;k=k+1) $write(" %0d", seq[k]); $write("\n");
         if (slen != 7) begin $display("SAMP LEN FAIL %0d", slen); errors=errors+1; end
         else for (k=0;k<7;k=k+1) if (seq[k]!==exp_samp[k]) begin

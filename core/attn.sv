@@ -1,12 +1,10 @@
-// Single-position multi-head attention with a REGISTERED vmem read (1-cycle latency,
-// read-ahead). Per head: load the query slice, score = scale*(q.k), softmax via
-// max-subtract + exp + sum, output = sum(e*v)/sum(e) (truncating divide). Each vmem
-// read loop presents the address one cycle before consuming the data; a delayed index
-// (x_d) tags which element the just-arrived data belongs to. The HEAD_DIM output
-// components of a head all divide by the same softmax sum, so their numerators are
-// accumulated first and then divided CONCURRENTLY by HEAD_DIM parallel dividers (one
-// divide latency per head instead of one per component). Bit-exact with QModel.attn_debug.
-// (SystemVerilog)
+// 등록된 vmem 읽기(1사이클 지연, read-ahead)를 사용하는 단일 위치 멀티헤드 어텐션.
+// 헤드마다: 쿼리 슬라이스 로드, score = scale*(q.k), max-차감 + exp + sum으로 softmax,
+// output = sum(e*v)/sum(e) (절삭 나눗셈). 각 vmem 읽기 루프는 데이터를 소비하기 한 사이클
+// 전에 주소를 제시하며, 지연 인덱스(x_d)가 방금 도착한 데이터가 어느 원소인지 태그함.
+// 한 헤드의 HEAD_DIM개 출력 성분은 모두 같은 softmax 합으로 나누므로, 분자들을 먼저
+// 누산한 뒤 HEAD_DIM개의 병렬 나눗셈기로 동시에 나눔(성분당이 아니라 헤드당 나눗셈
+// 지연 1회). QModel.attn_debug 와 비트 일치. (SystemVerilog)
 module attn #(
     parameter int N_EMBED  = 24,
     parameter int N_HEAD   = 4,
@@ -18,7 +16,7 @@ module attn #(
     input  logic        resetn,
     input  logic        start,
     input  logic signed [15:0] attn_scale,
-    input  logic [4:0]  ctx_len,        // number of valid context positions (1..BLOCK)
+    input  logic [4:0]  ctx_len,        // 유효 컨텍스트 위치 수 (1..BLOCK)
     input  logic [9:0]  q_base,
     input  logic [9:0]  k_base,
     input  logic [9:0]  v_base,
@@ -37,9 +35,9 @@ module attn #(
     phase_t    ph;
     logic [3:0]  h;
     logic [9:0]  hbase;
-    logic [4:0]  s, d;             // feed indices (s = context pos, d = within-head dim)
-    logic [4:0]  s_d, d_d;         // delayed: index of the data valid THIS cycle
-    logic [9:0]  soff;             // s*N_EMBED for the presented s
+    logic [4:0]  s, d;             // 피드 인덱스 (s = 컨텍스트 위치, d = 헤드 내 차원)
+    logic [4:0]  s_d, d_d;         // 지연됨: 이번 사이클에 유효한 데이터의 인덱스
+    logic [9:0]  soff;             // 제시된 s에 대한 s*N_EMBED
     logic        feeding, vld;
 
     logic signed [15:0] qreg [0:HEAD_DIM-1];
@@ -48,13 +46,13 @@ module attn #(
     logic signed [15:0] mmax;
     logic [31:0]        sum_e;
     logic signed [47:0] acc;
-    // pipeline stage 2 of scoring: the completed dot product is registered, then the
-    // scale (2nd multiply + saturates) and the max-compare run the next cycle.
+    // 점수 계산 파이프라인 스테이지 2: 완료된 닷 프로덕트를 등록한 뒤, 스케일(2차 곱셈 +
+    // 포화)과 max 비교를 다음 사이클에 실행.
     logic signed [47:0] dot_raw;
     logic [4:0]         dot_s;
     logic               dot_vld;
 
-    // address presented this cycle (registered into vmem -> data next cycle)
+    // 이번 사이클에 제시되는 주소 (vmem에 등록됨 -> 데이터는 다음 사이클)
     always_comb begin
         unique case (ph)
             P_QLOAD: v_raddr = q_base + hbase + {5'd0, d};
@@ -64,7 +62,7 @@ module attn #(
         endcase
     end
 
-    // score scaling: attn_scale * sat16(acc >> FRAC)
+    // 점수 스케일링: attn_scale * sat16(acc >> FRAC)
     function automatic logic signed [15:0] scale_score(input logic signed [47:0] a);
         logic signed [47:0] ash; logic signed [15:0] s1; logic signed [31:0] m, msh;
         ash = a >>> FRAC;
@@ -73,16 +71,16 @@ module attn #(
         return (msh > 32'sd32767) ? 16'sd32767 : (msh < -32'sd32768) ? -16'sd32768 : msh[15:0];
     endfunction
 
-    // exp(score[s]-max); exp_unit registers its input internally (latency 1)
+    // exp(score[s]-max); exp_unit은 입력을 내부적으로 등록함(지연 1)
     wire signed [16:0] diff = $signed(score[s]) - $signed(mmax);
     wire signed [15:0] dz = (diff < -17'sd32768) ? -16'sd32768 : diff[15:0];
     wire signed [15:0] eo;
     exp_unit u_exp (.clk(clk), .z(dz), .e(eo));
 
-    // weighted-sum divide: the HEAD_DIM numerators of a head share the denominator sum_e,
-    // so divide them all CONCURRENTLY -- one divide latency per head, not per component.
-    logic signed [47:0] num [0:HEAD_DIM-1];      // accumulated numerator per output component
-    logic               d_start;                 // shared start pulse for all dividers
+    // 가중합 나눗셈: 한 헤드의 HEAD_DIM개 분자는 분모 sum_e를 공유하므로 모두 동시에 나눔
+    // -- 성분당이 아니라 헤드당 나눗셈 지연 1회.
+    logic signed [47:0] num [0:HEAD_DIM-1];      // 출력 성분별 누산된 분자
+    logic               d_start;                 // 모든 나눗셈기 공유 start 펄스
     wire [HEAD_DIM-1:0] dv_done;
     wire signed [15:0]  o_sat_arr [0:HEAD_DIM-1];
     generate for (genvar gi = 0; gi < HEAD_DIM; gi++) begin : DIVS
@@ -95,7 +93,7 @@ module attn #(
             (qs > 48'sd32767) ? 16'sd32767 : (qs < -48'sd32768) ? -16'sd32768 : qs[15:0];
     end endgenerate
 
-    // MAC terms from the just-arrived data
+    // 방금 도착한 데이터로부터의 MAC 항
     wire signed [47:0] kprod = $signed(qreg[d_d[2:0]]) * $signed(v_rdata);          // q.k
     wire signed [47:0] vprod = $signed({1'b0, ev[s_d[3:0]]}) * $signed(v_rdata);    // e.v
     wire signed [47:0] kacc  = (d_d == 0) ? kprod : acc + kprod;
@@ -124,13 +122,13 @@ module attn #(
                     end
                 end
                 P_SCORE: begin
-                    // stage 2: finalize the registered dot product (scale + max compare)
+                    // 스테이지 2: 등록된 닷 프로덕트 마무리 (스케일 + max 비교)
                     if (dot_vld) begin
                         score[dot_s[3:0]] <= scale_score(dot_raw);
                         if (scale_score(dot_raw) > mmax) mmax <= scale_score(dot_raw);
                         if (dot_s == ctx_len - 1) begin s <= 0; sum_e <= 0; feeding <= 1; ph <= P_EXP; end
                     end
-                    // stage 1: MAC q.k; register the completed dot product
+                    // 스테이지 1: MAC q.k; 완료된 닷 프로덕트 등록
                     if (vld) begin
                         acc <= kacc;
                         if (d_d == HEAD_DIM - 1) begin
@@ -146,7 +144,7 @@ module attn #(
                     end
                 end
                 P_EXP: begin
-                    if (vld) begin                           // exp_unit output -> accumulate
+                    if (vld) begin                           // exp_unit 출력 -> 누산
                         ev[s_d[3:0]] <= eo;
                         sum_e <= sum_e + {16'd0, eo};
                         if (s_d == ctx_len - 1) begin
@@ -159,13 +157,13 @@ module attn #(
                     end
                 end
                 P_WSUM: begin
-                    // accumulate the numerator for component d; sweep s over the context
+                    // 성분 d의 분자를 누산; s를 컨텍스트에 걸쳐 스윕
                     if (vld) begin
                         acc <= vacc;
                         if (s_d == ctx_len - 1) begin
-                            num[d] <= vacc;                       // numerator for this component
+                            num[d] <= vacc;                       // 이 성분의 분자
                             if (d == HEAD_DIM - 1) begin
-                                d_start <= 1; feeding <= 0; ph <= P_WDIV;   // fire all dividers
+                                d_start <= 1; feeding <= 0; ph <= P_WDIV;   // 모든 나눗셈기 발사
                             end else begin
                                 d <= d + 1; s <= 0; soff <= 0; acc <= 0; feeding <= 1;
                             end

@@ -1,8 +1,8 @@
-// Unsigned integer square root: root = floor(sqrt(radicand)), W-bit radicand ->
-// W/2-bit root. Classic bit-pair (non-restoring) algorithm, W/2 cycles. Matches
-// Python math.isqrt. Used by RMSNorm. Synthesizable. (SystemVerilog)
+// 부호 없는 정수 제곱근: root = floor(sqrt(radicand)), W비트 radicand ->
+// W/2비트 root. 고전적 비트-페어(비복원) 알고리즘, W/2 사이클. Python math.isqrt와
+// 일치. RMSNorm이 사용. 합성 가능. (SystemVerilog)
 module isqrt #(
-    parameter int W = 48           // radicand width (even)
+    parameter int W = 48           // radicand 폭 (짝수)
 ) (
     input  logic           clk,
     input  logic           resetn,
@@ -12,9 +12,9 @@ module isqrt #(
     output logic           done,
     output logic [W/2-1:0] root
 );
-    logic [W-1:0] op;          // remaining radicand
-    logic [W-1:0] res;         // result accumulator
-    logic [W-1:0] bitm;        // current power-of-four
+    logic [W-1:0] op;          // 남은 radicand
+    logic [W-1:0] res;         // 결과 누산기
+    logic [W-1:0] bitm;        // 현재 4의 거듭제곱
     logic         st;
     logic [7:0]   cnt;
 
@@ -28,7 +28,7 @@ module isqrt #(
             if (!st) begin
                 if (start) begin
                     op   <= radicand; res <= '0;
-                    bitm <= {2'b01, {(W-2){1'b0}}};   // 1 << (W-2): top even bit
+                    bitm <= {2'b01, {(W-2){1'b0}}};   // 1 << (W-2): 최상위 짝수 비트
                     cnt  <= (W/2) - 1; busy <= 1'b1; st <= 1'b1;
                 end
             end else begin
@@ -40,7 +40,7 @@ module isqrt #(
                 end
                 bitm <= bitm >> 2;
                 if (cnt == 0) begin
-                    // res after this cycle holds floor(sqrt); expose via a final reg
+                    // 이 사이클 이후 res가 floor(sqrt)를 담음; 최종 레지스터로 노출
                     root <= ((op >= resbit) ? ((res >> 1) + bitm) : (res >> 1)) >> 0;
                     busy <= 1'b0; done <= 1'b1; st <= 1'b0;
                 end else cnt <= cnt - 8'd1;

@@ -1,14 +1,14 @@
-// Unit test for exp_unit vs the Python reference (sweep of z values).
+// Python 레퍼런스 대비 exp_unit의 유닛 테스트 (z 값 스윕).
 `timescale 1ns/1ps
 module tb_exp;
-    localparam M = 103;       // exact number of exp cases in the golden hex (skip logic below
-                              // still tolerates fewer via the x-sentinel; keep M == file lines)
+    localparam M = 103;       // 골든 hex의 정확한 exp 케이스 수 (아래 스킵 로직은 x-센티넬로
+                              // 더 적은 개수도 허용; M == 파일 줄 수로 유지)
     reg signed [15:0] zs [0:M-1], es [0:M-1];
     reg clk = 0;
     always #5 clk = ~clk;
     reg signed [15:0] zin;
     wire signed [15:0] eo;
-    exp_unit u_exp (.clk(clk), .z(zin), .e(eo));   // latency 1: e valid 1 cycle after z
+    exp_unit u_exp (.clk(clk), .z(zin), .e(eo));   // 지연 1: e는 z 1사이클 뒤 유효
 
     integer k, errors, n;
     initial begin

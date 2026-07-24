@@ -1,4 +1,4 @@
-// Unit test for the RMSNorm engine vs the Python fixed-point reference (dual-port vmem).
+// Python 고정소수점 레퍼런스 대비 RMSNorm 엔진의 유닛 테스트 (듀얼 포트 vmem).
 `timescale 1ns/1ps
 module tb_norm;
     localparam N = 24;
@@ -13,7 +13,7 @@ module tb_norm;
     wire [9:0] na_a, na_b; wire na_wea, na_web; wire signed [15:0] na_wda, na_wdb;
     wire [5:0] ga_a, ga_b; wire signed [15:0] gd_a, gd_b;
 
-    // ports muxed between the TB (load/readback) and norm (run)
+    // TB(로드/리드백)와 norm(실행) 사이에 먹스되는 포트
     wire        pa_we   = load ? tb_we    : na_wea;
     wire [9:0]  pa_addr = load ? tb_addr  : na_a;
     wire signed [15:0] pa_wd = load ? tb_wdata : na_wda;

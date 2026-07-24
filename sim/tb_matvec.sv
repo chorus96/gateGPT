@@ -1,5 +1,5 @@
-// Unit test for the matvec engine: load a known activation vector, run wq, and
-// compare the 24 outputs against the Python fixed-point reference (dual-port vmem).
+// matvec 엔진 유닛 테스트: 알려진 활성값 벡터를 로드하고 wq를 실행한 뒤, 24개 출력을
+// Python 고정소수점 레퍼런스와 비교(듀얼 포트 vmem).
 `timescale 1ns/1ps
 module tb_matvec;
     localparam N = 24;
@@ -9,14 +9,14 @@ module tb_matvec;
     reg signed [15:0] tin  [0:N-1];
     reg signed [15:0] texp [0:N-1];
 
-    reg        load;          // 1 = TB owns vmem ports
+    reg        load;          // 1 = TB가 vmem 포트를 소유
     reg        tb_we;
     reg  [9:0]  tb_addr;
     reg  signed [15:0] tb_wdata;
 
     wire [9:0] mv_aa, mv_ab; wire mv_wea, mv_web; wire signed [15:0] mv_wda, mv_wdb;
 
-    // ports muxed between the TB (load/readback) and matvec (run)
+    // TB(로드/리드백)와 matvec(실행) 사이에 먹스되는 포트
     wire        pa_we   = load ? tb_we   : mv_wea;
     wire [9:0]  pa_addr = load ? tb_addr : mv_aa;
     wire signed [15:0] pa_wd = load ? tb_wdata : mv_wda;
@@ -30,7 +30,7 @@ module tb_matvec;
         .we_b(pb_we), .addr_b(pb_addr), .wdata_b(pb_wd), .rdata_b(rdb));
 
     wire [11:0] w_addr;
-    wire [767:0] w_rdata;                                     // 24 lanes x 16-bit x 2 cols
+    wire [767:0] w_rdata;                                     // 24 레인 x 16비트 x 2 열
     wrom u_wrom (.sel(3'd0), .addr(w_addr), .wdata(w_rdata));  // sel=WQ
 
     wire mv_busy, mv_done;
@@ -52,17 +52,17 @@ module tb_matvec;
         load = 1; tb_we = 0; resetn = 0;
         repeat (4) @(posedge clk);
         resetn = 1;
-        // load activation vector into vmem[0..23]
+        // 활성값 벡터를 vmem[0..23]에 로드
         for (k = 0; k < N; k = k + 1) begin
             @(negedge clk); tb_we = 1; tb_addr = k[9:0]; tb_wdata = tin[k];
         end
         @(negedge clk); tb_we = 0;
-        // run matvec
+        // matvec 실행
         load = 0;
         @(negedge clk); start = 1; @(negedge clk); start = 0;
         wait (mv_done);
         @(posedge clk);
-        // read back vmem[64..64+23] and compare
+        // vmem[64..64+23]을 리드백하여 비교
         load = 1;
         for (k = 0; k < N; k = k + 1) begin
             tb_addr = 10'd64 + k[9:0];

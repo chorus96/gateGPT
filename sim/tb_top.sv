@@ -1,30 +1,27 @@
-// Board-level (TOP) testbench for xupv5_microgpt_top.
+// xupv5_microgpt_top을 위한 보드 레벨(TOP) 테스트벤치.
 //
-// Simulates the whole board -- DCM/clock buffers (behavioral stubs in
-// sim/xilinx_stubs.v), reset/​button debounce, rotary throttle, name generator
-// (core), HD44780 LCD driver and the tokens/second meter -- WITHOUT any Xilinx
-// UniSim library, so it runs under Verilator or iverilog.
+// 보드 전체를 시뮬레이션함 -- DCM/클럭 버퍼(sim/xilinx_stubs.sv의 동작 stub), 리셋/버튼
+// 디바운스, 로터리 스로틀, 이름 생성기(코어), HD44780 LCD 드라이버, 초당 토큰 미터 --
+// Xilinx UniSim 라이브러리 없이, 따라서 Verilator나 iverilog에서 실행됨.
 //
-// The top is instantiated with a reduced CLK_HZ (see SIMCLK_HZ) so the
-// CLK_HZ-derived real-time delays shrink to a simulatable number of cycles.
-// SIMCLK_HZ must stay >= 12_500_000, otherwise the LCD's setup delay
-// SU_CYC = CLK_HZ/12_500_000 underflows to 0 and the LCD FSM stalls.
+// top은 축소된 CLK_HZ(SIMCLK_HZ 참조)로 인스턴스화되어 CLK_HZ 파생 실시간 지연을
+// 시뮬레이션 가능한 사이클 수로 축소함. SIMCLK_HZ는 >= 12_500_000 을 유지해야 하며,
+// 그렇지 않으면 LCD의 셋업 지연 SU_CYC = CLK_HZ/12_500_000 이 0으로 언더플로되어 LCD FSM이 멈춤.
 //
-// Flow: release reset -> wait DCM lock -> wait the rotary start-up hold ->
-// drive the encoder clockwise to raise the auto-rotation speed -> capture the
-// first generated name and print it. A cycle watchdog guarantees termination.
+// 흐름: 리셋 해제 -> DCM lock 대기 -> 로터리 스타트업 홀드 대기 -> 엔코더를 시계방향으로
+// 구동해 자동 회전 속도를 올림 -> 첫 생성 이름을 포착해 출력. 사이클 워치독이 종료를 보장함.
 `timescale 1ns/1ps
 module tb_top;
-    localparam integer SIMCLK_HZ = 12_500_000;   // sim core clock (keep >= 12.5 MHz)
-    localparam integer WATCHDOG  = 25_000_000;   // hard stop (cycles)
+    localparam integer SIMCLK_HZ = 12_500_000;   // 시뮬레이션 코어 클럭 (>= 12.5 MHz 유지)
+    localparam integer WATCHDOG  = 25_000_000;   // 강제 정지 (사이클)
 
     reg clk = 0;
-    always #5 clk = ~clk;                         // pass-through DCM -> core runs on this
+    always #5 clk = ~clk;                         // 패스스루 DCM -> 코어가 이 클럭으로 동작
 
-    reg        rst_btn   = 1'b1;                  // active-high reset (released below)
-    reg        start_btn = 1'b0;                  // unused trigger on this board
+    reg        rst_btn   = 1'b1;                  // active-high 리셋 (아래에서 해제)
+    reg        start_btn = 1'b0;                  // 이 보드에서 미사용 트리거
     reg        rot_a = 0, rot_b = 0, rot_push = 0;
-    reg  [7:0] dip_sw = 8'h5a;                    // perturbs the seed
+    reg  [7:0] dip_sw = 8'h5a;                    // 시드를 교란
 
     wire [7:0] led;
     wire       lcd_rs, lcd_rw, lcd_e;
@@ -36,7 +33,7 @@ module tb_top;
         .lcd_rs(lcd_rs), .lcd_rw(lcd_rw), .lcd_e(lcd_e), .lcd_db(lcd_db)
     );
 
-    // ---- cycle counter + capture the first completed name ----
+    // ---- 사이클 카운터 + 첫 완료된 이름 포착 ----
     integer cyc = 0;
     reg          captured = 0;
     reg   [4:0]  cap_len;
@@ -52,9 +49,9 @@ module tb_top;
         end
     end
 
-    // ---- one clockwise detent: raises speed_level by 1 (once the rotary is armed) ----
-    // Quadrature CW sequence of {a,b}: 00 -> 01 -> 11 -> 10 -> 00 (4 edges = 1 detent).
-    // Each state is held longer than the rotary deglitch FILTER (2500 cycles).
+    // ---- 시계방향 디텐트 1회: speed_level을 1 올림 (로터리가 armed된 후) ----
+    // {a,b}의 쿼드러처 CW 시퀀스: 00 -> 01 -> 11 -> 10 -> 00 (4 엣지 = 1 디텐트).
+    // 각 상태는 로터리 디글리치 FILTER(2500 사이클)보다 길게 유지됨.
     localparam integer HOLD = 4000;
     task detent_cw;
         begin
@@ -68,35 +65,35 @@ module tb_top;
     integer i;
     reg [7:0] ch;
     initial begin
-        // release reset after a short pulse
+        // 짧은 펄스 후 리셋 해제
         repeat (30) @(posedge clk); rst_btn = 1'b0;
 
-        // DCM lock (stub asserts a few cycles after RST drops)
+        // DCM lock (stub이 RST 해제 몇 사이클 뒤 어서트)
         wait (dut.dcm_locked);
         $display("[cycle %0d] DCM locked", cyc);
 
-        // wait for the rotary start-up hold to expire, then raise speed to max
+        // 로터리 스타트업 홀드가 만료될 때까지 대기한 뒤, 속도를 최대로 올림
         wait (dut.u_rot.armed);
         $display("[cycle %0d] rotary armed, raising speed...", cyc);
         for (i = 0; i < 15 && !captured; i = i + 1) detent_cw;
         $display("[cycle %0d] speed_level=%0d", cyc, dut.u_rot.speed_level);
 
-        // first auto-generated name (the watchdog above bounds this)
+        // 첫 자동 생성 이름 (위의 워치독이 이를 제한)
         wait (captured);
         $write("generated name: ");
         for (i = 0; i < cap_len; i = i + 1) begin
-            ch = 8'd97 + cap_name[(i*8) +: 8];    // name_buf holds token-1; 'a'=97
+            ch = 8'd97 + cap_name[(i*8) +: 8];    // name_buf는 token-1을 담음; 'a'=97
             $write("%c", ch);
         end
         $write("   (len=%0d)\n", cap_len);
 
-        // basic sanity checks
+        // 기본 정상성 검사
         if (cap_len < 5'd1 || cap_len > 5'd16)
             $display("TOP FAIL: implausible name length %0d", cap_len);
         else if (dut.dcm_locked !== 1'b1)
             $display("TOP FAIL: DCM not locked");
         else begin
-            // exercise the LCD/meter a little longer, then pass
+            // LCD/미터를 조금 더 동작시킨 뒤 통과
             repeat (2000) @(posedge clk);
             $display("TOP PASS: board booted (DCM locked, LCD driving) and generated a name");
         end

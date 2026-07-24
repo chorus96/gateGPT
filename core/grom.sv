@@ -1,8 +1,8 @@
-// RMSNorm gain ROMs (Q5.11), three gains selected by sel (0=g1, 1=g2, 2=gf).
-// Emitted as a combinational case (core/gains.vh) -- XST does NOT reliably infer/
-// initialize a $readmemh ROM for arrays this small (it ties them to 0), which zeroed
-// the gains in hardware and produced garbage. Constants synthesize correctly.
-// Dual read (addr_a/addr_b) so the 2-elements/cycle scale pass can fetch both gains.
+// RMSNorm 게인 ROM (Q5.11), sel로 선택되는 세 게인 (0=g1, 1=g2, 2=gf).
+// 조합 case(core/gains.vh)로 방출됨 -- XST는 이렇게 작은 배열에 대해 $readmemh ROM을
+// 신뢰성 있게 추론/초기화하지 못하며(0으로 묶음), 이로 인해 하드웨어에서 게인이 0이 되어
+// 쓰레기를 냄. 상수는 올바르게 합성됨.
+// 듀얼 읽기(addr_a/addr_b)로 2원소/사이클 스케일 패스가 두 게인을 모두 가져올 수 있음.
 // (SystemVerilog)
 module grom (
     input  logic [1:0]         sel,

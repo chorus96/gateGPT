@@ -1,10 +1,10 @@
-// Activation scratchpad: block RAM, 1 write port + 1 *registered* read port.
-// The registered read (rdata valid one cycle after raddr) keeps the read-address
-// fanout tiny (a single BRAM, vs ~256 LUT-RAM primitives for distributed RAM),
-// which was the dominant routing delay. Actuators present the address one cycle
-// ahead and consume the data the next cycle (read-ahead). (SystemVerilog)
+// 활성값 스크래치패드: block RAM, 쓰기 포트 1개 + *등록된* 읽기 포트 1개.
+// 등록 읽기(rdata는 raddr 1사이클 뒤 유효)는 읽기 주소 팬아웃을 작게 유지하며
+// (분산 RAM의 ~256개 LUT-RAM 프리미티브 대비 단일 BRAM), 이것이 지배적 라우팅
+// 지연이었음. 액추에이터는 주소를 한 사이클 먼저 제시하고 다음 사이클에 데이터를
+// 소비함(read-ahead). (SystemVerilog)
 module vmem #(
-    parameter int AW = 10,   // address width (1024 words covers all scratch)
+    parameter int AW = 10,   // 주소 폭 (1024 워드가 전 스크래치를 커버)
     parameter int DW = 16
 ) (
     input  logic                 clk,
@@ -17,6 +17,6 @@ module vmem #(
     (* ram_style = "block" *) logic signed [DW-1:0] mem [0:(1<<AW)-1];
     always_ff @(posedge clk) begin
         if (we) mem[waddr] <= wdata;
-        rdata <= mem[raddr];          // registered read (1-cycle latency)
+        rdata <= mem[raddr];          // 등록 읽기 (1사이클 지연)
     end
 endmodule

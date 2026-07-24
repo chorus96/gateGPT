@@ -1,5 +1,5 @@
-// Embedding lookup: emb[i] = sat16( tok_embed[token][i] + pos_embed[pos][i] ),
-// i = 0..N_EMBED-1, written to vmem[dst_base+i]. Token/pos embedding ROMs (Q5.11).
+// 임베딩 조회: emb[i] = sat16( tok_embed[token][i] + pos_embed[pos][i] ),
+// i = 0..N_EMBED-1, vmem[dst_base+i]에 씀. 토큰/위치 임베딩 ROM (Q5.11).
 // (SystemVerilog)
 module embed #(
     parameter int N_EMBED = 24
@@ -16,8 +16,8 @@ module embed #(
     output logic        busy,
     output logic        done
 );
-    // Embedding ROMs as combinational case functions (NOT $readmemh: XST 14.7 zeroes
-    // small $readmemh distributed ROMs). tok = 27x24, pos = 16x24, row-major.
+    // 임베딩 ROM을 조합 case 함수로($readmemh가 아님: XST 14.7이 작은 $readmemh 분산
+    // ROM을 0으로 만듦). tok = 27x24, pos = 16x24, 행 우선.
 `include "tok_emb.vh"
 `include "pos_emb.vh"
 

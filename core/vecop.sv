@@ -1,8 +1,8 @@
-// Elementwise vector op over vmem (registered read -> read-ahead):
-//   op=0 ADD : dst[i] = sat16( a[i] + b[i] )   (residual adds)
-//   op=1 RELU: dst[i] = max(0, a[i])           (MLP activation)
-// ADD reads vector a into a local cache (read-ahead), then streams b and writes a+b.
-// RELU streams a and writes max(0,a). cnt up to MLP width (96). (SystemVerilog)
+// vmem 상의 원소별 벡터 연산 (등록 읽기 -> read-ahead):
+//   op=0 ADD : dst[i] = sat16( a[i] + b[i] )   (잔차 덧셈)
+//   op=1 RELU: dst[i] = max(0, a[i])           (MLP 활성화)
+// ADD는 벡터 a를 로컬 캐시에 읽어들인 뒤(read-ahead) b를 스트리밍하며 a+b를 씀.
+// RELU는 a를 스트리밍하며 max(0,a)를 씀. cnt는 최대 MLP 폭(96). (SystemVerilog)
 module vecop (
     input  logic        clk,
     input  logic        resetn,
@@ -26,9 +26,9 @@ module vecop (
     logic        feeding, vld;
     logic signed [15:0] areg [0:95];
 
-    assign v_raddr = (st == S_LOADA) ? (a_base + {3'd0, fi})    // ADD: cache a
-                   : op              ? (a_base + {3'd0, fi})    // RELU: read a
-                   :                   (b_base + {3'd0, fi});   // ADD: read b
+    assign v_raddr = (st == S_LOADA) ? (a_base + {3'd0, fi})    // ADD: a 캐시
+                   : op              ? (a_base + {3'd0, fi})    // RELU: a 읽기
+                   :                   (b_base + {3'd0, fi});   // ADD: b 읽기
 
     wire signed [16:0] add = $signed(areg[fi_d[6:0]]) + $signed(v_rdata);
     wire signed [15:0] addsat =
@@ -44,9 +44,9 @@ module vecop (
             unique case (st)
                 S_IDLE: if (start) begin
                     busy <= 1; fi <= 0; feeding <= 1;
-                    st <= op ? S_COMB : S_LOADA;   // RELU skips the a-cache
+                    st <= op ? S_COMB : S_LOADA;   // RELU는 a-캐시를 건너뜀
                 end
-                // ADD: cache vector a
+                // ADD: 벡터 a 캐시
                 S_LOADA: begin
                     if (vld) areg[fi_d[6:0]] <= v_rdata;
                     if (feeding) begin
@@ -55,7 +55,7 @@ module vecop (
                     end
                     if (vld && fi_d == cnt - 1) begin fi <= 0; feeding <= 1; st <= S_COMB; end
                 end
-                // ADD: stream b, write a+b ; RELU: stream a, write relu(a)
+                // ADD: b 스트리밍, a+b 쓰기 ; RELU: a 스트리밍, relu(a) 쓰기
                 S_COMB: begin
                     if (vld) begin
                         v_we <= 1; v_waddr <= dst_base + {3'd0, fi_d};
