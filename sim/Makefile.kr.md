@@ -47,7 +47,8 @@ flowchart TB
 make -C sim            # 모든 테스트벤치 빌드 + 실행 (유닛 6개 + 보드 TOP)
 make -C sim tb_core    # 하나만 빌드 + 실행
 make -C sim tb_top     # 보드 최상위 시뮬레이션
-make -C sim clean      # 빌드 산출물(obj/) 삭제
+make -C sim lint       # 정적 lint만 수행(-Wall), 빌드/실행 없음
+make -C sim clean      # 빌드 산출물(obj/, logs/) 삭제
 ```
 
 **요구 사항**: Verilator ≥ 5.006 (`--binary`, `--timing` 필요). 설치: `sudo apt-get install verilator`.
@@ -58,7 +59,9 @@ make -C sim clean      # 빌드 산출물(obj/) 삭제
 |---|---|
 | `ROOT` | 저장소 루트 = Makefile 디렉터리(`sim/`)의 부모. `$(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)`로 계산 |
 | `VERILATOR` | `verilator` (환경에서 `?=`로 오버라이드 가능) |
-| `VFLAGS` | `--binary --timing -Wno-fatal -Wno-WIDTH -Wno-PINMISSING -I$(ROOT)/core` |
+| `WAIVER` | `sim/gategpt.vlt` — Verilator lint waiver 파일(검토된 의도적 경고 억제) |
+| `VFLAGS` | `--binary --timing -Wall $(WAIVER) -I$(ROOT)/core` (빌드) |
+| `LINTFLAGS` | `--lint-only --timing -Wall $(WAIVER) -I$(ROOT)/core` (lint) |
 | `CORE` | `core/*.v` 전체 (`$(wildcard ...)`) |
 | `BOARD` | `board/*.v` 전체 |
 | `STUBS` | `sim/xilinx_stubs.v` (Xilinx 프리미티브 stub) |
@@ -66,16 +69,24 @@ make -C sim clean      # 빌드 산출물(obj/) 삭제
 | `LOGDIR` | `sim/logs` (테스트벤치별 실행 로그 디렉터리, gitignore 대상) |
 | `STAMP` | `$(shell date ...)` — make 시작 시 1회 평가되는 타임스탬프(로그 헤더용) |
 
-### `VFLAGS` 플래그 설명
+### `VFLAGS`/`LINTFLAGS` 플래그 설명
 
 | 플래그 | 의미 |
 |---|---|
 | `--binary` | Verilog 테스트벤치를 네이티브 실행 파일로 컴파일(각 `tb_*.v`가 자체 top) |
+| `--lint-only` | 빌드 없이 정적 검사만 수행(lint 타깃) |
 | `--timing` | `#delay`, `wait()`, `@(negedge clk)`, `always #5` 등 이벤트/타이밍 구문 지원(Verilator 5.x) |
-| `-Wno-fatal` | 경고를 치명 오류로 승격하지 않음(안전망) |
-| `-Wno-WIDTH` | 의도된 넓은 중간 표현식의 폭 경고 억제 |
-| `-Wno-PINMISSING` | `udiv.rem_out` 미연결 등 무해한 핀 경고 억제 |
+| `-Wall` | 모든 경고 활성화(엄격) — waiver로 걸러진 것만 통과 |
+| `$(WAIVER)` | `sim/gategpt.vlt` — 검토된 의도적 경고 범주를 waive(RTL 미수정) |
 | `-I$(ROOT)/core` | 코어의 `` `include "*.vh" `` (마이크로코드/가중치/exp/임베딩 ROM) 검색 경로 |
+
+### `sim/gategpt.vlt` (lint waiver)
+
+RTL을 전혀 건드리지 않고 lint를 완전히 깨끗하게 유지하기 위한 Verilator 공식 waiver 파일입니다.
+`WIDTHEXPAND`/`WIDTHTRUNC`(의도된 넓은 고정소수점 중간 표현식), `PINCONNECTEMPTY`/`PINMISSING`
+(미사용 예비 핀·`udiv.rem_out`), `UNUSEDSIGNAL`/`UNUSEDPARAM`, `BLKSEQ`(함수 내 블로킹),
+`SYNCASYNCNET`(DCM 비동기 리셋), `VARHIDDEN`, `TIMESCALEMOD`, `DECLFILENAME`,
+`UNSIGNED`(LCD의 CLK_HZ 파생 임계값) 범주를 각각 주석과 함께 waive합니다. Verilator 전용이며 ISE 합성엔 무영향.
 
 ## 타깃 그룹 (Targets)
 
@@ -85,7 +96,23 @@ make -C sim clean      # 빌드 산출물(obj/) 삭제
 | `TOP` (`tb_top`) | `CORE + BOARD + STUBS` | 보드 최상위 시뮬레이션 |
 | `TESTS` | — | `UNIT + TOP` (전체) |
 | `all` | — | 모든 테스트벤치 빌드+실행 |
-| `clean` | — | `OBJDIR` 삭제 |
+| `lint` | — | 보드 top + 7개 테스트벤치 top을 `-Wall`로 정적 검사(빌드/실행 없음) |
+| `clean` | — | `OBJDIR`·`LOGDIR` 삭제 |
+
+### `lint` 타깃
+
+```make
+lint:
+	@set -e; \
+	for spec in "xupv5_microgpt_top:$(BOARD) $(CORE) $(STUBS)" \
+	            $(foreach t,$(TESTS),"$(t):$(ROOT)/sim/$(t).v $(SRCS_$(t))"); do \
+	  top=$${spec%%:*}; srcs=$${spec#*:}; \
+	  $(VERILATOR) $(LINTFLAGS) --top-module $$top $$srcs && echo clean; \
+	done
+```
+
+- `set -e`로 하나라도 경고가 나면(새 lint 위반) 타깃이 **실패**합니다 → CI 게이트로 활용 가능.
+- 각 top(합성 대상 보드 top + 7개 TB)을 개별 lint하여 사용되지 않는 경로까지 검사.
 
 ### 테스트벤치별 소스 매핑
 

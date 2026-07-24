@@ -20,6 +20,7 @@ sudo apt-get install verilator
 make -C sim            # 모든 테스트벤치 빌드 + 실행 (유닛 6개 + 보드 TOP)
 make -C sim tb_core    # 하나만 빌드 + 실행
 make -C sim tb_top     # 보드 최상위(xupv5_microgpt_top) 시뮬레이션
+make -C sim lint       # 정적 lint만 수행(-Wall), 빌드/실행 없음
 make -C sim clean      # 빌드 산출물 삭제
 ```
 
@@ -77,11 +78,29 @@ CORE PASS: greedy + sampled match golden
 
 이 변경들은 ISE(iSim) 흐름과도 호환됩니다(상대 경로 검색은 XST에서도 동작).
 
-## 참고: 경고에 대하여
+## Lint (정적 검사) — 완전히 깨끗한 `-Wall`
 
-빌드 시 나오던 `WIDTH`(넓은 중간 표현식)·`PINMISSING`(`udiv.rem_out` 미연결) 경고는
-의도된 설계로 무해하며, `-Wno-WIDTH -Wno-PINMISSING`으로 억제했습니다. 모든 테스트벤치가
-Python 레퍼런스와 **비트 단위로 일치**하므로 시뮬레이션 정확성에는 영향이 없습니다.
+`make -C sim lint`은 합성 대상 보드 최상위와 7개 테스트벤치 top을 **빌드 없이** `-Wall`로 lint합니다.
+
+```
+== lint xupv5_microgpt_top     clean
+== lint tb_mathops             clean
+...
+LINT CLEAN: board top + all testbenches (-Wall)
+```
+
+깨끗한 트리는 경고 0개를 보고하며, **새로운** 경고가 생기면 타깃이 실패합니다(`set -e`).
+
+### waiver 파일 `sim/gategpt.vlt`
+
+`WIDTH`(의도된 넓은 고정소수점 중간 표현식)·`PINCONNECTEMPTY`/`PINMISSING`(미사용 예비 핀,
+`udiv.rem_out`)·`UNUSEDSIGNAL`·`SYNCASYNCNET`(DCM 비동기 리셋) 등 **검토를 마친 의도된** 경고 범주는
+Verilator 공식 waiver 파일 `sim/gategpt.vlt`로 처리합니다.
+
+- **RTL을 전혀 수정하지 않습니다** → 비트 일치·ISE 합성에 무영향. Verilator 전용이며 ISE 프로젝트에 포함되지 않음.
+- 빌드(`--binary`)와 lint(`--lint-only`) 모두 이 waiver를 사용하므로, 별도의 `-Wno-*` 플래그 없이도
+  `-Wall`이 깨끗하게 통과합니다.
+- 각 waiver에는 왜 무해한지 주석이 달려 있습니다. 모든 테스트벤치가 Python 레퍼런스와 **비트 단위로 일치**합니다.
 
 ## 보드 최상위(TOP) 시뮬레이션 — `tb_top`
 

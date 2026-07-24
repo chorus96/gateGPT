@@ -4,6 +4,7 @@
 #   make -C sim            # build + run every testbench
 #   make -C sim tb_core    # build + run one testbench (unit or the board top)
 #   make -C sim tb_top     # board-level (xupv5_microgpt_top) simulation
+#   make -C sim lint       # static lint only (-Wall), no build/run
 #   make -C sim clean
 #
 # Each run is echoed to the terminal AND saved to sim/logs/<testbench>.log
@@ -18,10 +19,12 @@
 
 ROOT      := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 VERILATOR ?= verilator
-# -Wno-WIDTH/PINMISSING: the RTL uses wider intermediate expressions on purpose and
-# leaves udiv.rem_out unconnected where the remainder is unused; both are benign here
-# (every testbench is bit-exact against the Python golden). -Wno-fatal catches the rest.
-VFLAGS    := --binary --timing -Wno-fatal -Wno-WIDTH -Wno-PINMISSING -I$(ROOT)/core
+# gategpt.vlt waives the reviewed, intentional lint categories (wide fixed-point
+# intermediates, unconnected spare pins, etc.) so -Wall stays clean without any
+# ad-hoc -Wno flags and without touching the bit-exact RTL. See the file header.
+WAIVER    := $(ROOT)/sim/gategpt.vlt
+VFLAGS    := --binary --timing -Wall $(WAIVER) -I$(ROOT)/core
+LINTFLAGS := --lint-only --timing -Wall $(WAIVER) -I$(ROOT)/core
 CORE      := $(wildcard $(ROOT)/core/*.v)
 BOARD     := $(wildcard $(ROOT)/board/*.v)
 STUBS     := $(ROOT)/sim/xilinx_stubs.v
@@ -40,9 +43,22 @@ TESTS := $(UNIT) $(TOP)
 $(foreach t,$(UNIT),$(eval SRCS_$(t) := $(CORE)))
 SRCS_$(TOP) := $(CORE) $(BOARD) $(STUBS)
 
-.PHONY: all clean $(TESTS)
+.PHONY: all clean lint $(TESTS)
 
 all: $(TESTS)
+
+# Static lint (no build/run): the synthesizable board top plus every testbench
+# top, at -Wall. gategpt.vlt waives the reviewed intentional categories, so a
+# clean tree reports zero warnings; any NEW warning fails the target (set -e).
+lint:
+	@set -e; \
+	for spec in "xupv5_microgpt_top:$(BOARD) $(CORE) $(STUBS)" \
+	            $(foreach t,$(TESTS),"$(t):$(ROOT)/sim/$(t).v $(SRCS_$(t))"); do \
+	  top=$${spec%%:*}; srcs=$${spec#*:}; \
+	  printf '== lint %-22s ' "$$top"; \
+	  $(VERILATOR) $(LINTFLAGS) --top-module $$top $$srcs && echo "clean"; \
+	done; \
+	echo "LINT CLEAN: board top + all testbenches (-Wall)"
 
 # For each testbench: a build rule (Verilator -> native binary) and a run rule.
 # We hand Verilator every source module; ones the top does not instantiate are pruned.
@@ -52,7 +68,7 @@ $(1): $(OBJDIR)/$(1)/$(1)_sim
 	@cd $(ROOT) && { echo "### $(1)  $(STAMP)"; $(OBJDIR)/$(1)/$(1)_sim; } 2>&1 | tee $(LOGDIR)/$(1).log
 	@echo "  -> log saved to sim/logs/$(1).log"
 
-$(OBJDIR)/$(1)/$(1)_sim: $(ROOT)/sim/$(1).v $(SRCS_$(1))
+$(OBJDIR)/$(1)/$(1)_sim: $(ROOT)/sim/$(1).v $(SRCS_$(1)) $(WAIVER)
 	@mkdir -p $(OBJDIR)/$(1)
 	$(VERILATOR) $(VFLAGS) --top-module $(1) --Mdir $(OBJDIR)/$(1) -o $(1)_sim \
 	    $(ROOT)/sim/$(1).v $(SRCS_$(1))
