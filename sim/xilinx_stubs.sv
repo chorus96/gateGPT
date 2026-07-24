@@ -1,12 +1,12 @@
-// xupv5_microgpt_top이 사용하는 Xilinx 7-series 클럭 프리미티브의 동작 stub이며, 이를 통해
+// xupv5_microgpt_top이 사용하는 Xilinx UltraScale+ 클럭 프리미티브의 동작 stub이며, 이를 통해
 // Xilinx UNISIM 라이브러리 없이 보드 최상위를 시뮬레이션할 수 있음(Verilator / iverilog에는
 // 벤더 셀이 없음).
 //
 // 시뮬레이션 전용 -- 이 파일을 Vivado 프로젝트에 추가하지 말 것; 거기서는 실제 UNISIM
-// 프리미티브(MMCME2_BASE, BUFG)를 사용함.
+// 프리미티브(MMCME4_BASE, BUFG)를 사용함.
 //
-// 모델은 top의 필요에 맞춰 사이클 정확함: BUFG는 입력을 통과시키고, MMCME2는 CLKIN1을
-// CLKOUT0/CLKFBOUT으로 그대로 전달함(x8/10 주파수 비는 사이클 기반 시뮬레이션에서 무의미
+// 모델은 top의 필요에 맞춰 사이클 정확함: BUFG는 입력을 통과시키고, MMCME4는 CLKIN1을
+// CLKOUT0/CLKFBOUT으로 그대로 전달함(x12/15 주파수 비는 사이클 기반 시뮬레이션에서 무의미
 // -- 전 설계가 단지 테스트벤치 클럭으로 동작함), 그리고 RST 해제 몇 사이클 뒤 LOCKED를 어서트함.
 `timescale 1ns/1ps
 
@@ -15,8 +15,8 @@ module BUFG (input wire I, output wire O);
     assign O = I;
 endmodule
 
-// ---- 혼합 모드 클럭 매니저 (base) ----
-module MMCME2_BASE #(
+// ---- 혼합 모드 클럭 매니저 (UltraScale+ base) ----
+module MMCME4_BASE #(
     parameter        CLKIN1_PERIOD    = 10.0,
     parameter        DIVCLK_DIVIDE    = 1,
     parameter        CLKFBOUT_MULT_F  = 8.0,

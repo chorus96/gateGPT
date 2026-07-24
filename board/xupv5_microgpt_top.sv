@@ -7,10 +7,12 @@
 //
 // PC 측(USB JTAG 케이블): 선택적 ChipScope/ILA VIO 코어 (CHIPSCOPE_VIO).
 //
-// 코어는 80 MHz로 동작(MMCME2 x8/10: 100 MHz -> VCO 800 MHz -> 80 MHz).
+// 코어는 80 MHz로 동작(MMCME4 x12/15: 100 MHz -> VCO 1200 MHz -> 80 MHz).
 // 원래 설계는 Virtex-5 + ISE 14.7(DCM CLKFX x4/5, post-PAR 80.24 MHz)이었으나,
-// Vivado는 Virtex-5를 지원하지 않으므로 Artix-7(xc7a100t)로 리타깃됨.
-// (SystemVerilog, Vivado 24.2 / 7-series)
+// Vivado는 Virtex-5를 지원하지 않으므로 Kria K26 SOM(Zynq UltraScale+ MPSoC,
+// xck26-sfvc784-2LV-c)으로 리타깃됨. Kria는 PL 오실레이터 핀이 없으므로 clk_100은
+// PS의 pl_clk0(100 MHz)에서 공급됨(블록 디자인).
+// (SystemVerilog, Vivado 24.2 / Zynq UltraScale+)
 module xupv5_microgpt_top (
     input  logic        clk_100,      // 100 MHz 보드 오실레이터
     input  logic        rst_btn,      // 리셋 푸시 버튼 (active high)
@@ -32,16 +34,17 @@ module xupv5_microgpt_top (
     // 합성은 기본값을 유지하므로 보드 동작은 변하지 않음.
     parameter int CLK_HZ = 80_000_000;   // 코어는 DCM CLKFX (100*4/5) = 80 MHz로 동작
 
-    // ---------------- 클럭킹: 100 MHz osc -> MMCME2 -> 80 MHz 코어 (7-series) -----
-    // MMCME2_BASE: 100 MHz * (CLKFBOUT_MULT_F=8 / DIVCLK_DIVIDE=1) = VCO 800 MHz,
-    // CLKOUT0 = 800 / CLKOUT0_DIVIDE_F=10 = 80 MHz. Vivado가 clk_100 입력에 IBUF를 추론함.
-    // (원래 Virtex-5 DCM_BASE CLKFX x4/5 를 대체.)
+    // ---------------- 클럭킹: 100 MHz(PS pl_clk0) -> MMCME4 -> 80 MHz 코어 (UltraScale+) -----
+    // MMCME4_BASE: 100 MHz * (CLKFBOUT_MULT_F=12 / DIVCLK_DIVIDE=1) = VCO 1200 MHz,
+    // CLKOUT0 = 1200 / CLKOUT0_DIVIDE_F=15 = 80 MHz. (UltraScale+ MMCM VCO 범위 800~1600 MHz)
+    // clk_100은 Kria PS의 pl_clk0(100 MHz)에서 옴 -- 블록 디자인에서 zynq_ultra_ps_e ->
+    // clk_100 으로 연결. (원래 Virtex-5 DCM_BASE CLKFX x4/5 를 대체.)
     wire clk, clkfb, clkfb_bufg, clk80, mmcm_locked;
-    MMCME2_BASE #(
-        .CLKIN1_PERIOD(10.0),          // 100 MHz 입력
+    MMCME4_BASE #(
+        .CLKIN1_PERIOD(10.0),          // 100 MHz 입력 (PS pl_clk0)
         .DIVCLK_DIVIDE(1),
-        .CLKFBOUT_MULT_F(8.0),         // VCO = 100 * 8 = 800 MHz (600..1200 범위)
-        .CLKOUT0_DIVIDE_F(10.0)        // CLKOUT0 = 800 / 10 = 80 MHz
+        .CLKFBOUT_MULT_F(12.0),        // VCO = 100 * 12 = 1200 MHz (800..1600 범위)
+        .CLKOUT0_DIVIDE_F(15.0)        // CLKOUT0 = 1200 / 15 = 80 MHz
     ) u_mmcm (
         .CLKIN1(clk_100), .RST(rst_btn), .PWRDWN(1'b0),
         .CLKFBIN(clkfb_bufg), .CLKFBOUT(clkfb), .CLKFBOUTB(),

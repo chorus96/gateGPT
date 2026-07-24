@@ -10,7 +10,7 @@
 > 원래의 **Verilog-2001** 기반을 정리한 것으로, 개념적 배경으로 유효합니다.
 > 생성된 `core/*.vh`(마이크로코드/가중치 ROM)는 여전히 Verilog(함수/`localparam`)이며 SV 모듈에서 그대로 포함됩니다.
 > **주의:** SV 이관으로 XST 14.7(ISE) 합성 흐름은 폐기되었고, **Vivado 24.2**로 전환되었습니다.
-> Vivado는 Virtex-5를 지원하지 않으므로 보드는 **Artix-7(xc7a100t)**로 리타깃됨(`DCM_BASE` → `MMCME2_BASE`,
+> Vivado는 Virtex-5를 지원하지 않으므로 보드는 **Kria K26(xck26, Zynq UltraScale+)**로 리타깃됨(`DCM_BASE` → `MMCME4_BASE`,
 > `.ucf` → `.xdc`). 빌드는 `build_board_vivado_project.tcl`, 시뮬레이션은 Verilator를 사용하세요.
 
 **대상 파일 (25개)**

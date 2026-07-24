@@ -1,28 +1,40 @@
 # ============================================================================
 #  Vivado 24.2 project build for gateGPT (board top: core + name_generator + LCD +
-#  rotary + tok/s meter + MMCME2 clocking).
+#  rotary + tok/s meter + MMCME4 clocking).
 #
-#  Device: xc7a100tcsg324-1 (Artix-7, Digilent Nexys A7-100T).
-#  Top:    xupv5_microgpt_top   (retargeted from Virtex-5/ISE; Vivado has no Virtex-5).
+#  Device: xck26-sfvc784-2LV-c  (Kria K26 SOM, Zynq UltraScale+ MPSoC; KV260/KR260).
+#  Top:    xupv5_microgpt_top    (retargeted from Virtex-5/ISE; Vivado has no Virtex-5).
 #
 #  Usage:
 #     vivado -mode batch -source build_board_vivado_project.tcl
 #   or, to just create the project (no runs), pass -tclargs noflow:
 #     vivado -mode batch -source build_board_vivado_project.tcl -tclargs noflow
 #
+#  KRIA NOTES:
+#   1. Clock: the K26 has no free PL oscillator pin -- clk_100 must be driven by the
+#      PS fabric clock pl_clk0 (100 MHz). For a real bitstream, wrap this RTL top in a
+#      block design that instantiates zynq_ultra_ps_e and connects pl_clk0 -> clk_100
+#      (a helper is sketched at the bottom of this file). This project-mode script
+#      builds the PL logic standalone (synth checks out; clk_100 is a create_clock net).
+#   2. Peripherals: Kria SOMs have no onboard switches/LEDs/LCD/rotary. Assign the
+#      <FILL_ME> LOCs in board/kria_k26_microgpt.xdc to your carrier's PMOD/expansion
+#      pins before implementation.
+#
 #  Replaces the ISE flow (build_board_ise_project.tcl / run_board_bitgen.tcl / *.ucf).
 # ============================================================================
 
 set root [file dirname [file normalize [info script]]]
-set part xc7a100tcsg324-1
+set part xck26-sfvc784-2LV-c
 set top  xupv5_microgpt_top
 set prj  $root/vivado_prj
 
 create_project -force gategpt $prj -part $part
+# Kria board part (optional, if the board files are installed):
+# set_property board_part xilinx.com:kv260_som:part0:1.4 [current_project]
 
 # --- RTL sources (SystemVerilog) ---
 # NOTE: sim/xilinx_stubs.sv is intentionally NOT added -- Vivado uses the real UNISIM
-# MMCME2_BASE/BUFG. The generated ROM includes (core/*.vh) are found via include_dirs.
+# MMCME4_BASE/BUFG. The generated ROM includes (core/*.vh) are found via include_dirs.
 add_files -norecurse [glob $root/core/*.sv]
 add_files -norecurse [glob $root/board/*.sv]
 set_property file_type SystemVerilog [get_files -filter {FILE_TYPE == Verilog}]
@@ -30,7 +42,7 @@ set_property include_dirs $root/core [get_filesets sources_1]
 set_property top $top [current_fileset]
 
 # --- constraints ---
-add_files -fileset constrs_1 -norecurse $root/board/nexys_a7_microgpt.xdc
+add_files -fileset constrs_1 -norecurse $root/board/kria_k26_microgpt.xdc
 
 # --- optional ChipScope/ILA VIO macro (off by default; standalone LCD demo) ---
 # set_property verilog_define {CHIPSCOPE_VIO} [current_fileset]
@@ -38,6 +50,7 @@ add_files -fileset constrs_1 -norecurse $root/board/nexys_a7_microgpt.xdc
 puts "=== gategpt Vivado project created at $prj (part=$part, top=$top) ==="
 
 # --- run synthesis + implementation + bitstream (skip with -tclargs noflow) ---
+# NOTE: implementation needs real PACKAGE_PIN LOCs in the XDC (see KRIA NOTES).
 if {[lsearch -exact $argv "noflow"] >= 0} {
     puts "=== noflow: project created, skipping synth/impl ==="
 } else {
@@ -48,3 +61,16 @@ if {[lsearch -exact $argv "noflow"] >= 0} {
     set bit [glob -nocomplain [get_property DIRECTORY [get_runs impl_1]]/*.bit]
     puts "=== bitstream: $bit ==="
 }
+
+# ---------------------------------------------------------------------------
+#  OPTIONAL Kria block-design sketch (clk_100 from PS pl_clk0). Uncomment and run
+#  in place of the project flow above once you have the KV260/KR260 board part.
+# ---------------------------------------------------------------------------
+# create_bd_design "gategpt_bd"
+# set ps [create_bd_cell -type ip -vlnv xilinx.com:ip:zynq_ultra_ps_e ps]
+# apply_bd_automation -rule xilinx.com:bd_rule:zynq_ultra_ps_e -config {apply_board_preset 1} $ps
+# set_property -dict {CONFIG.PSU__FPGA_PL0_ENABLE 1 CONFIG.PSU__CRL_APB__PL0_REF_CTRL__FREQMHZ 100} $ps
+# set top_cell [create_bd_cell -type module -reference $top u_top]
+# connect_bd_net [get_bd_pins ps/pl_clk0] [get_bd_pins u_top/clk_100]
+# # ... make peripheral ports external and constrain in the XDC ...
+# make_wrapper -files [get_files gategpt_bd.bd] -top

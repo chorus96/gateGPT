@@ -110,15 +110,15 @@ Verilator 공식 waiver 파일 `sim/gategpt.vlt`로 처리합니다.
 
 ### 1. Xilinx 프리미티브 stub (`sim/xilinx_stubs.sv`)
 
-TOP은 7-시리즈 클럭 프리미티브 `BUFG`, `MMCME2_BASE`를 인스턴스화하는데, Verilator/iverilog에는
+TOP은 UltraScale+ 클럭 프리미티브 `BUFG`, `MMCME4_BASE`를 인스턴스화하는데, Verilator/iverilog에는
 Xilinx UNISIM 라이브러리가 없습니다. `sim/xilinx_stubs.sv`가 이들의 **동작 모델**을 제공합니다:
 
 - `BUFG`: 입력을 출력으로 통과(`assign O = I`).
-- `MMCME2_BASE`: `CLKIN1`을 `CLKOUT0`/`CLKFBOUT`으로 통과(사이클 기반 시뮬레이션에서는 x8/10 비가
+- `MMCME4_BASE`: `CLKIN1`을 `CLKOUT0`/`CLKFBOUT`으로 통과(사이클 기반 시뮬레이션에서는 x12/15 비가
   무의미 — 전 설계가 단일 테스트벤치 클럭으로 동작), `RST` 해제 몇 사이클 뒤 `LOCKED` 어서트.
 
 > **주의**: 이 stub은 **시뮬레이션 전용**입니다. Vivado 프로젝트에는 포함하지 마세요(거기서는 실제 UNISIM 사용).
-> (원래 Virtex-5 `DCM_BASE`를 썼으나 Vivado 미지원으로 7-시리즈 `MMCME2_BASE`로 리타깃됨.)
+> (원래 Virtex-5 `DCM_BASE`를 썼으나 Vivado 미지원으로 UltraScale+ `MMCME4_BASE`로 리타깃됨.)
 
 ### 2. `CLK_HZ` 파라미터화
 
@@ -156,7 +156,7 @@ TOP PASS: board booted (MMCM locked, LCD driving) and generated a name
 ## 합성 흐름과의 관계
 
 RTL이 SystemVerilog로 이관되면서 원래의 ISE 14.7(iSim) 흐름은 폐기되었고, 합성은 **Vivado 24.2**로
-전환되었습니다. Vivado는 Virtex-5를 지원하지 않아 보드는 **Artix-7(xc7a100t, Nexys A7-100T)**로
-리타깃되었습니다 — `DCM_BASE` → `MMCME2_BASE`, `.ucf` → `board/nexys_a7_microgpt.xdc`, ISE tcl →
+전환되었습니다. Vivado는 Virtex-5를 지원하지 않아 보드는 **Kria K26(xck26, KV260)**로
+리타깃되었습니다 — `DCM_BASE` → `MMCME4_BASE`, `.ucf` → `board/kria_k26_microgpt.xdc`, ISE tcl →
 `build_board_vivado_project.tcl`. Verilator는 그 합성 RTL을 오픈소스 도구만으로 골든 검증하는
 경로이며, `sim/xilinx_stubs.sv`가 Vivado 프리미티브를 대체합니다.

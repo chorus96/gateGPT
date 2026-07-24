@@ -221,17 +221,21 @@ make -C sim lint       # -Wall static lint (clean)
 ```
 
 Build the board bitstream with **Vivado 24.2**. The RTL is now SystemVerilog and the
-original Virtex-5 target is not supported by Vivado, so the board flow is **retargeted to
-an Artix-7** (Digilent Nexys A7-100T, `xc7a100tcsg324-1`); the Virtex-5 `DCM_BASE` becomes an
-`MMCME2_BASE` (100 MHz → 80 MHz) and the ISE `.ucf` becomes `board/nexys_a7_microgpt.xdc`:
+original Virtex-5 target is not supported by Vivado, so the board flow is **retargeted to a
+Kria K26 SOM** (Zynq UltraScale+ MPSoC, `xck26-sfvc784-2LV-c`; KV260/KR260 carrier); the
+Virtex-5 `DCM_BASE` becomes an `MMCME4_BASE` (100 MHz → 80 MHz) and the ISE `.ucf` becomes
+`board/kria_k26_microgpt.xdc`:
 
 ```bash
 vivado -mode batch -source build_board_vivado_project.tcl            # synth + impl + bitstream
 vivado -mode batch -source build_board_vivado_project.tcl -tclargs noflow   # create project only
 ```
 
-> The measurements and bring-up notes above are from the original Virtex-5 / ISE 14.7 build;
-> the numbers are historical. On Artix-7 the design closes 80 MHz comfortably.
+> **Kria specifics:** the K26 has no free PL oscillator, so `clk_100` is sourced from the PS
+> fabric clock `pl_clk0` (100 MHz) via a block design; and the SOM has no onboard
+> switches/LEDs/LCD/rotary, so those I/O map to the carrier's PMOD/expansion (fill the
+> `<FILL_ME>` LOCs in the XDC). The measurements and bring-up notes above are from the
+> original Virtex-5 / ISE 14.7 build and are historical.
 
 ## Board
 

@@ -7,16 +7,16 @@
 데모: 이름이 16×2 LCD에 자동으로 순환합니다. **로터리 엔코더**가 두 설정 중 하나를 조정하며,
 **누르기**로 선택합니다: RATE(회전 속도, 1 Hz ~ 연속) 또는 TEMP(샘플링 온도, T=0.5..1.2).
 TEMP 모드에서 `led[5]` 점등, LCD 2행은 활성 설정(`rate: NNNNN t/s` 또는 `temp: X.Y`) 표시.
-DIP 스위치가 랜덤 시드를 교란합니다. 코어는 80 MHz(MMCME2 ×8/10: 100→VCO 800→80 MHz).
+DIP 스위치가 랜덤 시드를 교란합니다. 코어는 80 MHz(MMCME4 ×12/15: 100→VCO 1200→80 MHz).
 
 > 원래 Virtex-5/ISE 14.7(DCM CLKFX ×4/5, post-PAR 80.24 MHz) 타깃이었으나, Vivado가 Virtex-5를
-> 지원하지 않아 **Artix-7(xc7a100t)**로 리타깃됨 — `DCM_BASE` → `MMCME2_BASE`.
+> 지원하지 않아 **Kria K26(xck26, Zynq UltraScale+)**로 리타깃됨 — `DCM_BASE` → `MMCME4_BASE`.
 
 ## 블록 다이어그램
 
 ```mermaid
 flowchart TB
-    OSC(["clk_100 (100MHz)"]) --> DCM["MMCME2_BASE<br/>×8/10 → 80MHz"] --> CLK["clk (코어)"]
+    OSC(["clk_100 (100MHz)"]) --> DCM["MMCME4_BASE<br/>×12/15 → 80MHz"] --> CLK["clk (코어)"]
     RSTBTN(["rst_btn"]) --> RSTF["동기+디바운스"] --> RESETN["resetn"]
     ROT(["rot_a/b/push"]) --> RT["rotary_throttle"]
     RT -->|"auto_start"| GEN
@@ -39,7 +39,7 @@ flowchart TB
 
 | 블록 | 역할 |
 |---|---|
-| `MMCME2_BASE` | 100 MHz → 80 MHz 코어 클럭(×8/10), BUFG 피드백 |
+| `MMCME4_BASE` | 100 MHz → 80 MHz 코어 클럭(×12/15), BUFG 피드백 |
 | 리셋 디바운스 | `rst_btn`을 ~2 ms 안정화 후 동기 리셋; MMCM lock까지 리셋 유지 |
 | start 버튼 디바운스 | ~66 Hz 글리치 라인을 걸러냄(의도적으로 트리거로 미사용) |
 | `seed_live` | 자유 실행 카운터 + DIP 스위치 XOR → 시드 |
@@ -59,5 +59,6 @@ flowchart TB
 
 ## RTL과의 관계
 보드 최상위로, 코어(`name_generator`→`microgpt_core`)와 주변장치(로터리/LCD/미터/MMCM)를 통합.
-Vivado 빌드는 `build_board_vivado_project.tcl` + `board/nexys_a7_microgpt.xdc`(Artix-7).
-`board/xupv5_microgpt.ucf`가 핀 매핑을 제공.
+Vivado 빌드는 `build_board_vivado_project.tcl` + `board/kria_k26_microgpt.xdc`(Kria K26, Zynq
+UltraScale+). Kria는 PL 오실레이터 핀이 없어 `clk_100`은 PS `pl_clk0`에서 공급되며, 온보드
+스위치/LED/LCD/로터리가 없으므로 캐리어(KV260/KR260) Pmod/확장에 핀을 매핑해야 함.
