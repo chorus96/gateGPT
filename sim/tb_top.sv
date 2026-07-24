@@ -8,7 +8,7 @@
 // 시뮬레이션 가능한 사이클 수로 축소함. SIMCLK_HZ는 >= 12_500_000 을 유지해야 하며,
 // 그렇지 않으면 LCD의 셋업 지연 SU_CYC = CLK_HZ/12_500_000 이 0으로 언더플로되어 LCD FSM이 멈춤.
 //
-// 흐름: 리셋 해제 -> DCM lock 대기 -> 로터리 스타트업 홀드 대기 -> 엔코더를 시계방향으로
+// 흐름: 리셋 해제 -> MMCM lock 대기 -> 로터리 스타트업 홀드 대기 -> 엔코더를 시계방향으로
 // 구동해 자동 회전 속도를 올림 -> 첫 생성 이름을 포착해 출력. 사이클 워치독이 종료를 보장함.
 `timescale 1ns/1ps
 module tb_top;
@@ -16,7 +16,7 @@ module tb_top;
     localparam integer WATCHDOG  = 25_000_000;   // 강제 정지 (사이클)
 
     reg clk = 0;
-    always #5 clk = ~clk;                         // 패스스루 DCM -> 코어가 이 클럭으로 동작
+    always #5 clk = ~clk;                         // 패스스루 MMCM -> 코어가 이 클럭으로 동작
 
     reg        rst_btn   = 1'b1;                  // active-high 리셋 (아래에서 해제)
     reg        start_btn = 1'b0;                  // 이 보드에서 미사용 트리거

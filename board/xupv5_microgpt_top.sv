@@ -32,7 +32,7 @@ module xupv5_microgpt_top (
     // 오버라이드하여 CLK_HZ 파생 실시간 지연(LCD 전원 투입/settle, 로터리 스타트업 홀드,
     // 자동 회전 간격, tok/s 윈도우)을 축소할 수 있음.
     // 합성은 기본값을 유지하므로 보드 동작은 변하지 않음.
-    parameter int CLK_HZ = 80_000_000;   // 코어는 DCM CLKFX (100*4/5) = 80 MHz로 동작
+    parameter int CLK_HZ = 80_000_000;   // 코어는 MMCME4 (100*12/15) = 80 MHz로 동작
 
     // ---------------- 클럭킹: 100 MHz(PS pl_clk0) -> MMCME4 -> 80 MHz 코어 (UltraScale+) -----
     // MMCME4_BASE: 100 MHz * (CLKFBOUT_MULT_F=12 / DIVCLK_DIVIDE=1) = VCO 1200 MHz,
@@ -58,7 +58,7 @@ module xupv5_microgpt_top (
 
     // ---------------- 리셋 버튼: 동기 + 디바운스 -------------------------------
     // rst_btn은 누름/뗌 시 바운스함; 동기 리셋을 바꾸기 전에 레벨이 RST_FILTER(~2 ms)
-    // 동안 안정할 것을 요구함. DCM은 원시 버튼을 RST에 유지함(전원 투입 시 리셋되어야
+    // 동안 안정할 것을 요구함. MMCM은 원시 버튼을 RST에 유지함(전원 투입 시 리셋되어야
     // 하고 lock 시 자체 해제됨).
     localparam int RST_FILTER = 100000;        // ~2 ms @ 50 MHz
     logic [1:0]  rb_sync   = 2'd0;

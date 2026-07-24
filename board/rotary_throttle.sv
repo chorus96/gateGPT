@@ -68,7 +68,7 @@ module rotary_throttle #(
 
     // ---- 쿼드러처 디코드: 부호 있는 엣지 누산, 디텐트당 한 스텝 ----
     localparam int EDGES_PER_DETENT = 4;
-    localparam int STARTUP_HOLD     = CLK_HZ / 5;   // ~200 ms 전원 투입/DCM-lock 홀드오프
+    localparam int STARTUP_HOLD     = CLK_HZ / 5;   // ~200 ms 전원 투입/MMCM-lock 홀드오프
 
     logic [1:0] ab, ab_d;
     always_ff @(posedge clk) begin
