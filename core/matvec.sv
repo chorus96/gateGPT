@@ -36,8 +36,8 @@ module matvec #(
 );
     typedef enum logic [1:0] { S_IDLE, S_RUN, S_DRAIN, S_WB } state_t;
     localparam int HW = LANES*16;               // 하프워드 경계 (열 2j+1 오프셋)
-    // 산술용 크기 지정 LANES 복사본: 정수 파라미터의 비트 선택(LANES[6:0])은 XST 14.7에서
-    // 잘못 합성됨(obase를 0으로 만들어 멀티 타일 행렬곱이 보드에서 멈춤).
+    // 산술용 크기 지정 LANES 복사본: 정수 파라미터의 비트 선택(LANES[6:0])이 원래 ISE/XST
+    // 14.7에서 잘못 합성돼(obase를 0으로 만들어 멀티 타일 행렬곱이 보드에서 멈춤) 도입, Vivado에서도 유지.
     localparam logic [6:0] LANES_W = LANES;
     state_t    st;
     logic [6:0]  fi;                    // 현재 타일 내 열-쌍(피드) 인덱스

@@ -70,9 +70,9 @@ def _tiled_words(W, lanes=24):
 
 
 def write_func_vh(path, func_name, ret_w, idx_w, values, idx2=None, signed=False):
-    """조합 ROM을 명시적 상수의 Verilog 함수로 방출한다. XST 14.7은 작은
-    $readmemh 분산 ROM 배열을 0으로 묶어버리므로, 코어가 읽는 모든 ROM
-    (마이크로코드, 가중치, exp 테이블, 임베딩)을 대신 이 방식으로 방출한다."""
+    """조합 ROM을 명시적 상수의 Verilog 함수로 방출한다. 원래 ISE/XST 14.7이 작은
+    $readmemh 분산 ROM 배열을 0으로 묶어버려서 채택한 방식으로, 코어가 읽는 모든 ROM
+    (마이크로코드, 가중치, exp 테이블, 임베딩)을 이 방식으로 방출한다(Vivado에서도 유지)."""
     nh = (ret_w + 3) // 4
     sgn = " signed" if signed else ""
     with open(path, "w") as f:
@@ -118,8 +118,8 @@ def main():
         for v in EXP_TAB:
             f.write(f"{int(v) & 0xFFFF:04x}\n")
 
-    # 게인을 조합 case로(XST는 이 작은 배열에 ROM을 추론하지 않고 $readmemh를
-    # 0으로 묶으므로 -> 명시적 상수로 방출).
+    # 게인을 조합 case로(원래 ISE/XST가 이 작은 배열에 ROM을 추론하지 않고 $readmemh를
+    # 0으로 묶어서 -> 명시적 상수로 방출; Vivado에서도 유지).
     with open(os.path.join(ROOT, "core", "gains.vh"), "w") as f:
         f.write("// Auto-generated RMSNorm gains (Q5.11). gsel 0=g1 1=g2 2=gf.\n")
         f.write("function signed [15:0] gain_lut;\n")
@@ -131,9 +131,9 @@ def main():
                 f.write(f"        7'd{key}: gain_lut = 16'sh{int(gain[idx]) & 0xFFFF:04x};\n")
         f.write("        default: gain_lut = 16'sd0;\n    endcase\nendfunction\n")
 
-    # 코어가 읽는 모든 ROM도 조합 case 함수로 방출한다. XST 14.7이 작은 $readmemh
-    # 분산 ROM을 0으로 만들기 때문(보드에서 가중치/exp/임베딩을 0으로 남겨 -> 엉터리
-    # 이름). 위의 .hex 파일들은 시뮬레이션/레퍼런스용으로 유지된다.
+    # 코어가 읽는 모든 ROM도 조합 case 함수로 방출한다. 원래 ISE/XST 14.7이 작은 $readmemh
+    # 분산 ROM을 0으로 만들었기 때문(보드에서 가중치/exp/임베딩을 0으로 남겨 -> 엉터리 이름);
+    # Vivado에서도 이 방식을 유지. 위의 .hex 파일들은 시뮬레이션/레퍼런스용으로 유지된다.
     CORE = os.path.join(ROOT, "core")
     wsel = {0: m.wq, 1: m.wk, 2: m.wv, 3: m.wo, 4: m.fc1, 5: m.fc2, 6: m.lm}
     wwords = {s: _tiled_words(W) for s, W in wsel.items()}

@@ -3,8 +3,9 @@
 // tile*(in_dim/2) + j 로 주소 지정됨; wdata[lane*16 +:16]는 열 2j에 대한 레인의 가중치,
 // wdata[LANES*16 + lane*16 +:16]는 열 2j+1에 대한 것.
 // 내용은 조합 case 함수(core/wrom_data.vh)에서 옴, $readmemh가 아님:
-// XST 14.7은 작은 $readmemh 분산 ROM을 0으로 묶음(보드에서 가중치를 0으로 만듦 -> 쓰레기
-// 이름). 명시적 case 상수는 LUT로 신뢰성 있게 합성됨. (SystemVerilog)
+// 원래 ISE/XST 14.7이 작은 $readmemh 분산 ROM을 0으로 묶어(보드에서 가중치를 0으로 만듦
+// -> 쓰레기 이름) 명시적 case 상수로 바꿨고, LUT로 신뢰성 있게 합성됨. 이 구조를 Vivado
+// 흐름에서도 그대로 유지함. (SystemVerilog)
 module wrom #(
     parameter int LANES = 24
 ) (

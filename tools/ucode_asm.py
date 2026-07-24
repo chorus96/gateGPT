@@ -68,10 +68,10 @@ def main():
     with open(os.path.join(ROOT, "generated", "ucode.hex"), "w") as f:
         for w in prog:
             f.write(f"{w & ((1 << 72) - 1):018x}\n")
-    # 마이크로코드 ROM을 조합 case로($readmemh 아님): XST 14.7이 작은 $readmemh
-    # 분산 ROM을 0으로 묶어서, 보드에서 프로그램이 전부 NOP로 남았고 -> 시퀀서가
-    # HALT에 도달하지 못해 코어가 멈췄다. 명시적 case 상수는 LUT로 안정적으로
-    # 합성된다(core/gains.vh와 같은 기법).
+    # 마이크로코드 ROM을 조합 case로($readmemh 아님): 원래 ISE/XST 14.7이 작은 $readmemh
+    # 분산 ROM을 0으로 묶어서 보드에서 프로그램이 전부 NOP로 남았고 -> 시퀀서가 HALT에
+    # 도달하지 못해 코어가 멈췄기 때문. Vivado에서도 이 방식을 유지. 명시적 case 상수는
+    # LUT로 안정적으로 합성된다(core/gains.vh와 같은 기법).
     with open(os.path.join(ROOT, "core", "ucode_rom.vh"), "w") as f:
         f.write("// Auto-generated microcode ROM (combinational). Do not edit by hand.\n")
         f.write("function [71:0] ucode_rom;\n")

@@ -1,6 +1,6 @@
 // 실제 초당 토큰 미터. 1초 윈도우 동안 token_valid 스트로브를 세고, 초당 한 번 그 개수를
 // 5개 BCD 자릿수(0..99999)로 래치함. BCD로 직접 세면 이진->십진 나눗셈을 피할 수 있음
-// (XST는 2의 거듭제곱으로만 나눔). (SystemVerilog)
+// (원래 ISE/XST는 2의 거듭제곱으로만 나눴음). (SystemVerilog)
 module tok_meter #(
     parameter int CLK_HZ = 50_000_000
 ) (

@@ -20,8 +20,9 @@ module vmem2 #(
     input  logic signed [DW-1:0] wdata_b,
     output logic signed [DW-1:0] rdata_b
 );
-    // XST 진정한 듀얼 포트 BRAM 템플릿: 공유 배열에 대해 포트당 하나의 always 블록.
-    // (두 포트를 한 블록에 넣으면 XST가 block RAM이 아닌 플립플롭으로 폴백함.)
+    // 진정한 듀얼 포트 BRAM 추론 템플릿: 공유 배열에 대해 포트당 하나의 always 블록.
+    // (원래 ISE/XST 시절 두 포트를 한 블록에 넣으면 block RAM이 아닌 플립플롭으로 폴백했음;
+    //  이 템플릿은 Vivado BRAM 추론에도 그대로 적합.)
     (* ram_style = "block" *) logic signed [DW-1:0] mem [0:(1<<AW)-1];
     always_ff @(posedge clk) begin                 // 포트 A
         if (we_a) mem[addr_a] <= wdata_a;

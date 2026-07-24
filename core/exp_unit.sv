@@ -10,8 +10,8 @@ module exp_unit (
     input  logic signed [15:0] z,
     output logic signed [15:0] e
 );
-    // exp 테이블을 조합 case 함수로($readmemh가 아님: XST 14.7이 작은 $readmemh 분산 ROM을
-    // 0으로 만듦). 17개 항목: exp_tab_rom[k] = round(exp(-k)*2048).
+    // exp 테이블을 조합 case 함수로($readmemh가 아님: 원래 ISE/XST 14.7이 작은 $readmemh
+    // 분산 ROM을 0으로 만들어 채택, Vivado에서도 유지). 17개 항목: exp_tab_rom[k] = round(exp(-k)*2048).
 `include "exp_data.vh"
 
     // 스테이지 1 (조합): |z|, 테이블 조회, 디코드

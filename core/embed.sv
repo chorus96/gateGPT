@@ -16,8 +16,8 @@ module embed #(
     output logic        busy,
     output logic        done
 );
-    // 임베딩 ROM을 조합 case 함수로($readmemh가 아님: XST 14.7이 작은 $readmemh 분산
-    // ROM을 0으로 만듦). tok = 27x24, pos = 16x24, 행 우선.
+    // 임베딩 ROM을 조합 case 함수로($readmemh가 아님: 원래 ISE/XST 14.7이 작은 $readmemh
+    // 분산 ROM을 0으로 만들어 채택, Vivado에서도 유지). tok = 27x24, pos = 16x24, 행 우선.
 `include "tok_emb.vh"
 `include "pos_emb.vh"
 

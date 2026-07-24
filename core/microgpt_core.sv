@@ -22,9 +22,9 @@ module microgpt_core (
 `include "coremap.vh"
 
     // ---------------- 프로그램 ROM (조합 case) + 페치/디코드 ----------------
-    // 마이크로코드는 조합 함수이며 $readmemh 분산 ROM이 아님: XST 14.7은 작은 $readmemh
-    // ROM 배열을 0으로 묶어 보드에서 프로그램을 전부 NOP로 만들었음(시퀀서가 HALT에
-    // 도달하지 못해 코어가 멈춤). core/ucode_rom.vh 참조.
+    // 마이크로코드는 조합 함수이며 $readmemh 분산 ROM이 아님: 원래 ISE/XST 14.7이 작은
+    // $readmemh ROM 배열을 0으로 묶어 보드에서 프로그램을 전부 NOP로 만들어(시퀀서가 HALT에
+    // 도달 못해 코어 멈춤) 채택, Vivado에서도 유지. core/ucode_rom.vh 참조.
 `include "ucode_rom.vh"
     logic [7:0]  pc;
     wire [71:0] instr   = ucode_rom(pc);
