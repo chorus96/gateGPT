@@ -24,7 +24,11 @@ module xupv5_microgpt_top (
     output wire        lcd_e,
     output wire [3:0]  lcd_db        // DB[7:4]
 );
-    localparam integer CLK_HZ = 80_000_000;   // core runs at DCM CLKFX (100*4/5) = 80 MHz
+    // CLK_HZ is a parameter (default = the real 80 MHz core clock) so a simulation top
+    // can override it to a smaller value and shrink the CLK_HZ-derived real-time delays
+    // (LCD power-on/settle, rotary start-up hold, auto-rotation interval, tok/s window).
+    // Synthesis keeps the default, so board behaviour is unchanged.
+    parameter integer CLK_HZ = 80_000_000;   // core runs at DCM CLKFX (100*4/5) = 80 MHz
 
     // ---------------- clocking: 100 MHz osc -> DCM CLKFX (x4/5) -> 80 MHz core -----
     // After the block-RAM + pipeline rework the core is ~89 MHz post-synth; it closes

@@ -17,8 +17,9 @@ sudo apt-get install verilator
 ## 빠른 시작
 
 ```bash
-make -C sim            # 모든 테스트벤치 빌드 + 실행
+make -C sim            # 모든 테스트벤치 빌드 + 실행 (유닛 6개 + 보드 TOP)
 make -C sim tb_core    # 하나만 빌드 + 실행
+make -C sim tb_top     # 보드 최상위(xupv5_microgpt_top) 시뮬레이션
 make -C sim clean      # 빌드 산출물 삭제
 ```
 
@@ -51,6 +52,7 @@ CORE PASS: greedy + sampled match golden
 | `tb_norm` | `norm` + `grom` + `udiv` + `isqrt` | `generated/test_norm_*.hex` |
 | `tb_attn` | `attn` + `exp_unit` + `udiv` + `vmem` | `generated/test_attn_*.hex` |
 | `tb_core` | 전체 `microgpt_core` 엔드투엔드 | `core/*.vh` (마이크로코드/가중치) |
+| `tb_top`  | **보드 최상위** `xupv5_microgpt_top` (DCM·리셋·로터리·LCD·미터+코어) | 내부 자기생성 이름 |
 
 ## 동작 원리
 
@@ -80,6 +82,56 @@ CORE PASS: greedy + sampled match golden
 빌드 시 나오던 `WIDTH`(넓은 중간 표현식)·`PINMISSING`(`udiv.rem_out` 미연결) 경고는
 의도된 설계로 무해하며, `-Wno-WIDTH -Wno-PINMISSING`으로 억제했습니다. 모든 테스트벤치가
 Python 레퍼런스와 **비트 단위로 일치**하므로 시뮬레이션 정확성에는 영향이 없습니다.
+
+## 보드 최상위(TOP) 시뮬레이션 — `tb_top`
+
+`xupv5_microgpt_top`은 실제 보드 전체(클럭 합성 → 리셋/버튼 디바운스 → 로터리 스로틀 →
+이름 생성기(코어) → HD44780 LCD → 초당 토큰 미터)를 통합합니다. 이를 Verilator로 돌리기 위해
+두 가지 장애물을 해결했습니다.
+
+### 1. Xilinx 프리미티브 stub (`sim/xilinx_stubs.v`)
+
+TOP은 Virtex-5 클럭 프리미티브 `IBUFG`, `BUFG`, `DCM_BASE`를 인스턴스화하는데, Verilator/iverilog에는
+Xilinx UniSim 라이브러리가 없습니다. `sim/xilinx_stubs.v`가 이들의 **동작 모델**을 제공합니다:
+
+- `IBUFG`/`BUFG`: 입력을 출력으로 통과(`assign O = I`).
+- `DCM_BASE`: `CLKIN`을 `CLK0`/`CLKFX`로 통과(사이클 기반 시뮬레이션에서는 4/5 주파수 비가 무의미 —
+  전 설계가 단일 테스트벤치 클럭으로 동작), `RST` 해제 몇 사이클 뒤 `LOCKED` 어서트.
+
+> **주의**: 이 stub은 **시뮬레이션 전용**입니다. ISE 합성 프로젝트에는 포함하지 마세요(거기서는 실제 UniSim 사용).
+
+### 2. `CLK_HZ` 파라미터화
+
+LCD·로터리·미터의 지연이 `CLK_HZ`(실제 80 MHz)에서 파생되어, 80 MHz 그대로면 전원 투입·자동 회전
+간격 등이 수천만 사이클이 됩니다. TOP의 `CLK_HZ`를 `localparam` → **`parameter`**(기본값 80 MHz 유지,
+합성 무영향)로 바꿔, 시뮬레이션 top이 작은 값으로 오버라이드할 수 있게 했습니다.
+
+`tb_top`은 `#(.CLK_HZ(12_500_000))`으로 오버라이드합니다.
+- **하한 12.5 MHz 제약**: LCD 셋업 지연 `SU_CYC = CLK_HZ/12_500_000`이 0이 되면(=CLK_HZ<12.5M)
+  LCD FSM이 멈추므로, 이 값 이상이어야 합니다.
+
+### 시뮬레이션 흐름
+
+1. 리셋 펄스 해제 → `dut.dcm_locked` 대기(stub이 곧 어서트).
+2. 로터리 스타트업 홀드(`CLK_HZ/5` ≈ 2.5M 사이클) 만료(`dut.u_rot.armed`) 대기.
+3. 로터리를 **시계방향으로 구동**(쿼드러처 `00→01→11→10→00` 시퀀스, 디글리치 FILTER보다 길게 유지)하여
+   `speed_level`을 올림 → 자동 생성 간격 단축.
+4. 첫 이름 생성(`dut.gen_done`)을 포착해 ASCII로 디코드·출력.
+5. 이름 길이·DCM lock 검증 후 `TOP PASS`. 사이클 워치독으로 종료 보장(무한 정지 없음).
+
+### 기대 출력
+
+```
+[cycle 38] DCM locked
+[cycle 2600032] rotary armed, raising speed...
+[cycle 2664031] speed_level=4
+generated name: sivont   (len=6)
+TOP PASS: board booted (DCM locked, LCD driving) and generated a name
+```
+
+- 생성되는 이름은 시드(=자유 실행 카운터 `seed_live` ^ `dip_sw`)가 발사 시점에 결정되므로 특정 골든이 아닌,
+  **유효한 이름 하나가 생성됨**을 확인합니다. 약 2~3초, 수백만 사이클 내 완료됩니다.
+- 로터리 구동이 완벽하지 않아도, 자동 회전(1 Hz)의 자연 발사 + 워치독이 안전망 역할을 합니다.
 
 ## iSim과의 관계
 
