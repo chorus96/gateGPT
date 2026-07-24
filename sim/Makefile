@@ -6,6 +6,9 @@
 #   make -C sim tb_top     # board-level (xupv5_microgpt_top) simulation
 #   make -C sim clean
 #
+# Each run is echoed to the terminal AND saved to sim/logs/<testbench>.log
+# (tee), so the full transcript of every simulation is kept on disk.
+#
 # Requires Verilator >= 5.006 (needs --binary and --timing). Install on Debian/Ubuntu:
 #   sudo apt-get install verilator
 #
@@ -23,6 +26,9 @@ CORE      := $(wildcard $(ROOT)/core/*.v)
 BOARD     := $(wildcard $(ROOT)/board/*.v)
 STUBS     := $(ROOT)/sim/xilinx_stubs.v
 OBJDIR    := $(ROOT)/sim/obj
+# per-testbench run logs land in LOGDIR (keep the value free of trailing spaces)
+LOGDIR    := $(ROOT)/sim/logs
+STAMP     := $(shell date '+%Y-%m-%d %H:%M:%S')
 
 # Unit / core testbenches (need only core/*.v).
 UNIT  := tb_mathops tb_exp tb_matvec tb_norm tb_attn tb_core
@@ -42,7 +48,9 @@ all: $(TESTS)
 # We hand Verilator every source module; ones the top does not instantiate are pruned.
 define RUN_TB
 $(1): $(OBJDIR)/$(1)/$(1)_sim
-	@cd $(ROOT) && $(OBJDIR)/$(1)/$(1)_sim
+	@mkdir -p $(LOGDIR)
+	@cd $(ROOT) && { echo "### $(1)  $(STAMP)"; $(OBJDIR)/$(1)/$(1)_sim; } 2>&1 | tee $(LOGDIR)/$(1).log
+	@echo "  -> log saved to sim/logs/$(1).log"
 
 $(OBJDIR)/$(1)/$(1)_sim: $(ROOT)/sim/$(1).v $(SRCS_$(1))
 	@mkdir -p $(OBJDIR)/$(1)
@@ -53,4 +61,4 @@ endef
 $(foreach t,$(TESTS),$(eval $(call RUN_TB,$(t))))
 
 clean:
-	rm -rf $(OBJDIR)
+	rm -rf $(OBJDIR) $(LOGDIR)

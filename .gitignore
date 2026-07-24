@@ -64,4 +64,5 @@ fuseRelaunch.cmd
 
 # Verilator build artifacts
 sim/obj/
+sim/logs/
 obj_dir/

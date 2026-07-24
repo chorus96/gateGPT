@@ -63,6 +63,8 @@ make -C sim clean      # 빌드 산출물(obj/) 삭제
 | `BOARD` | `board/*.v` 전체 |
 | `STUBS` | `sim/xilinx_stubs.v` (Xilinx 프리미티브 stub) |
 | `OBJDIR` | `sim/obj` (빌드 산출물 디렉터리, gitignore 대상) |
+| `LOGDIR` | `sim/logs` (테스트벤치별 실행 로그 디렉터리, gitignore 대상) |
+| `STAMP` | `$(shell date ...)` — make 시작 시 1회 평가되는 타임스탬프(로그 헤더용) |
 
 ### `VFLAGS` 플래그 설명
 
@@ -102,7 +104,10 @@ SRCS_$(TOP) := $(CORE) $(BOARD) $(STUBS)            # TOP → 코어+보드+stub
 ```make
 define RUN_TB
 $(1): $(OBJDIR)/$(1)/$(1)_sim
-	@cd $(ROOT) && $(OBJDIR)/$(1)/$(1)_sim          # 실행 규칙(루트에서 실행)
+	@mkdir -p $(LOGDIR)                              # 로그 디렉터리 준비
+	@cd $(ROOT) && { echo "### $(1)  $(STAMP)"; $(OBJDIR)/$(1)/$(1)_sim; } \
+	    2>&1 | tee $(LOGDIR)/$(1).log                # 실행 + 터미널·로그 동시 출력(tee)
+	@echo "  -> log saved to sim/logs/$(1).log"
 
 $(OBJDIR)/$(1)/$(1)_sim: $(ROOT)/sim/$(1).v $(SRCS_$(1))
 	@mkdir -p $(OBJDIR)/$(1)                         # 중첩 디렉터리 미리 생성
@@ -122,6 +127,10 @@ $(foreach t,$(TESTS),$(eval $(call RUN_TB,$(t))))    # 모든 타깃에 적용
 
 ## 핵심 설계 포인트
 
+- **로그 파일 생성**: 각 실행을 `tee $(LOGDIR)/<tb>.log`로 터미널과 로그 파일에 **동시 출력**하여,
+  모든 시뮬레이션 전체 기록을 `sim/logs/<테스트벤치>.log`에 보존(타임스탬프 헤더 포함). `clean`이 함께 삭제.
+  > **주의**: `LOGDIR` 값 뒤에 인라인 주석을 붙이면 후행 공백이 값에 포함되어 `tee`가 두 인자를 받게 되므로,
+  > 주석은 별도 줄에 둡니다(Make의 `:=` 후행 공백 보존 특성).
 - **루트에서 실행**: 컴파일된 바이너리를 `cd $(ROOT)`로 실행 → 테스트벤치의
   `$readmemh("generated/*.hex", ...)` 상대 경로가 해결됨.
 - **`-I$(ROOT)/core`**: 코어가 참조하는 생성된 `.vh`(조합 case ROM)를 찾는 검색 경로.
