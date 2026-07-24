@@ -48,7 +48,7 @@ set_property top $top [current_fileset]
 # --- constraints ---
 add_files -fileset constrs_1 -norecurse $root/board/kr260_microgpt.xdc
 
-# --- optional ChipScope/ILA VIO macro (off by default; standalone LCD demo) ---
+# --- optional Vivado ILA/VIO debug macro (off by default; standalone LCD demo) ---
 # set_property verilog_define {CHIPSCOPE_VIO} [current_fileset]
 
 puts "=== gategpt Vivado project created at $prj (part=$part, top=$top) ==="

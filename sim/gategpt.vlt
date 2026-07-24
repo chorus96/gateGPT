@@ -12,11 +12,11 @@
 lint_off -rule WIDTHEXPAND
 lint_off -rule WIDTHTRUNC
 
-// Unused upper bits / sized parameters (e.g. spare DCM outputs, LANES_W).
+// Unused upper bits / sized parameters (e.g. spare MMCM outputs, LANES_W).
 lint_off -rule UNUSEDSIGNAL
 lint_off -rule UNUSEDPARAM
 
-// Intentionally-unconnected pins: spare DCM clock outputs and udiv.rem_out
+// Intentionally-unconnected pins: spare MMCM clock outputs and udiv.rem_out
 // where the remainder is not consumed.
 lint_off -rule PINCONNECTEMPTY
 lint_off -rule PINMISSING
@@ -25,7 +25,7 @@ lint_off -rule PINMISSING
 // same-cycle scratch register.
 lint_off -rule BLKSEQ
 
-// rst_btn feeds the DCM's asynchronous reset and is also debounced
+// rst_btn feeds the MMCM's asynchronous reset and is also debounced
 // synchronously in the top -- correct on real hardware.
 lint_off -rule SYNCASYNCNET
 

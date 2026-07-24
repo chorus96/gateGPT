@@ -5,7 +5,7 @@
 // TEMP 모드에서 led[5] 점등; LCD 2행은 활성 설정("rate: NNNNN t/s" 또는 "temp: X.Y")을
 // 표시. DIP 스위치는 랜덤 시드를 교란함.
 //
-// PC 측(USB JTAG 케이블): 선택적 ChipScope/ILA VIO 코어 (CHIPSCOPE_VIO).
+// PC 측(USB JTAG 케이블): 선택적 VIO 디버그 코어 (Vivado ILA/VIO; 원래 ISE ChipScope, define CHIPSCOPE_VIO).
 //
 // 코어는 80 MHz로 동작(MMCME4 x12/15: 100 MHz -> VCO 1200 MHz -> 80 MHz).
 // 원래 설계는 Virtex-5 + ISE 14.7(DCM CLKFX x4/5, post-PAR 80.24 MHz)이었으나,
@@ -14,7 +14,7 @@
 // PS의 pl_clk0(100 MHz)에서 공급됨(블록 디자인).
 // (SystemVerilog, Vivado 24.2 / Zynq UltraScale+)
 module xupv5_microgpt_top (
-    input  logic        clk_100,      // 100 MHz 보드 오실레이터
+    input  logic        clk_100,      // 100 MHz 클럭 입력 (Kria: PS pl_clk0; 원래는 보드 오실레이터)
     input  logic        rst_btn,      // 리셋 푸시 버튼 (active high)
     input  logic        start_btn,    // "하나 생성" 푸시 버튼 (active high)
     input  logic [7:0]  dip_sw,       // 8개 DIP 스위치 (시드 비트)
@@ -134,11 +134,12 @@ module xupv5_microgpt_top (
     endfunction
 
     // 생성 트리거 = 로터리 스로틀(자동 회전) + 선택적 호스트(VIO).
-    // start_btn (AJ6)은 의도적으로 트리거가 아님: 이 보드에서 해당 라인이 ~66 Hz로 자유
-    // 실행되어 2 ms 디바운스를 그대로 통과했고(66 Hz 구형파는 반주기당 >2 ms 안정) ~330 t/s
+    // start_btn은 의도적으로 트리거가 아님: 원래 XUPV5 보드에서 해당 라인(핀 AJ6)이 ~66 Hz로
+    // 자유 실행되어 2 ms 디바운스를 그대로 통과했고(66 Hz 구형파는 반주기당 >2 ms 안정) ~330 t/s
     // 바닥값을 만들었음. gen_start=0 브링업 테스트로 증명됨(LCD가 배너에서 정지, 0 t/s ->
     // 생성기가 스스로 실행되지 않음), 따라서 유일한 소스는 btn_pulse였음. 스로틀은 레벨 0에서
-    // 구조적으로 1 Hz로 제한되므로 데모는 이제 ~5 t/s로 시작함.
+    // 구조적으로 1 Hz로 제한되므로 데모는 이제 ~5 t/s로 시작함. (KR260에서는 다른 SOM240 핀에
+    // 매핑되므로 이 글리치는 없을 수 있으나, 안전하게 계속 트리거에서 제외.)
     wire        gen_start = auto_start | vio_start;
     wire        _unused   = btn_pulse;   // start_btn은 배선/디바운스 유지하되 미사용
     wire [31:0] gen_seed  = vio_use_host ? vio_seed : (seed_live ^ {24'd0, dip_sw});
@@ -245,7 +246,7 @@ module xupv5_microgpt_top (
     end
     assign led = {hb, gen_busy, cfg_mode, speed_level};   // led[5] = temp 조정 중 1
 
-    // ---------------- ChipScope VIO (USB JTAG 통한 PC) ----------------------------
+    // ---------------- VIO 디버그 코어 (Vivado ILA/VIO; USB JTAG 통한 PC) -----------
 `ifdef CHIPSCOPE_VIO
     wire [35:0]  vio_control;
     wire [49:0]  vio_sync_out;
