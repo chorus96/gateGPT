@@ -1,9 +1,9 @@
 """
-Fixed-point integer reference for NamesGPT — the authoritative spec the RTL core
-must reproduce bit-for-bit. Everything is Q5.11 signed 16-bit (FRAC=11). All ops
-use only integer arithmetic that maps directly to hardware: wide MAC + arithmetic
-right shift, integer isqrt + reciprocal for RMSNorm, a table+interp exp, and a
-32-bit LCG for sampling. (These are our own choices, designed for this project.)
+NamesGPT의 고정소수점 정수 레퍼런스 — RTL 코어가 비트 단위로 재현해야 하는
+기준 스펙. 모든 값은 Q5.11 부호 있는 16비트(FRAC=11). 모든 연산은 하드웨어에
+직접 매핑되는 정수 산술만 사용한다: 넓은 MAC + 산술 우측 시프트, RMSNorm용
+정수 isqrt + 역수, 테이블+보간 exp, 샘플링용 32비트 LCG.
+(이들은 이 프로젝트를 위해 설계한 우리 고유의 선택이다.)
 """
 import math
 import numpy as np
@@ -19,52 +19,52 @@ def sat16(v):
 
 
 def tdiv(a, b):
-    """Truncate toward zero (matches a sign-magnitude hardware divider)."""
+    """0 방향으로 절삭(부호-크기 하드웨어 나눗셈기와 일치)."""
     qq = abs(int(a)) // abs(int(b))
     return -qq if (a < 0) != (b < 0) else qq
 
 
 def q(x):
-    """float -> Q5.11 saturated int16 (round to nearest)."""
+    """float -> Q5.11 포화 int16(반올림)."""
     return sat16(int(math.floor(x * SCALE + 0.5)))
 
 
-# ---- exp table: EXP_TAB[k] = round(exp(-k) * 2048), k = 0..EXP_K -------------
+# ---- exp 테이블: EXP_TAB[k] = round(exp(-k) * 2048), k = 0..EXP_K -------------
 EXP_K = 16
 EXP_TAB = [int(math.floor(math.exp(-k) * SCALE + 0.5)) for k in range(EXP_K + 1)]
 
 
 def exp_neg_q11(z):
-    """exp(z) in Q11 for z <= 0 (z in Q11). Table lookup + linear interpolation."""
+    """z <= 0(z는 Q11)에 대한 Q11 형식 exp(z). 테이블 조회 + 선형 보간."""
     if z >= 0:
         return SCALE
     u = -z                                  # >= 0, Q11
-    ui = u >> FRAC                           # integer part
+    ui = u >> FRAC                           # 정수부
     if ui >= EXP_K:
         return 0
-    uf = u & (SCALE - 1)                     # fractional part, Q11
-    lo, hi = EXP_TAB[ui], EXP_TAB[ui + 1]    # hi <= lo (decreasing)
-    e = lo + ((hi - lo) * uf >> FRAC)        # arithmetic shift (uf>=0)
+    uf = u & (SCALE - 1)                     # 소수부, Q11
+    lo, hi = EXP_TAB[ui], EXP_TAB[ui + 1]    # hi <= lo (감소)
+    e = lo + ((hi - lo) * uf >> FRAC)        # 산술 시프트(uf>=0)
     return e if e > 0 else 0
 
 
 def matvec(W_q, x_q):
-    """y[o] = sat16( (sum_i W[o,i]*x[i]) >> FRAC ). W_q:[out,in] int, x_q:[in] int."""
+    """y[o] = sat16( (sum_i W[o,i]*x[i]) >> FRAC ). W_q:[out,in] 정수, x_q:[in] 정수."""
     acc = W_q.astype(np.int64) @ x_q.astype(np.int64)
     return np.array([sat16(int(a) >> FRAC) for a in acc], dtype=np.int64)
 
 
 def rmsnorm(x_q, gain_q):
-    """y = x / sqrt(mean(x^2)) * gain, all Q11, via integer isqrt + reciprocal."""
+    """y = x / sqrt(mean(x^2)) * gain, 모두 Q11, 정수 isqrt + 역수로 계산."""
     n = len(x_q)
     ss = int((x_q.astype(np.int64) ** 2).sum())      # Q22
     mean_sq = ss // n                                 # Q22
     if mean_sq < 1:
         mean_sq = 1
-    r = math.isqrt(mean_sq)                           # Q11 (sqrt of Q22)
+    r = math.isqrt(mean_sq)                           # Q11 (Q22의 제곱근)
     if r < 1:
         r = 1
-    scale = (1 << (2 * FRAC)) // r                    # 2^22 / r  -> Q11 reciprocal-sqrt
+    scale = (1 << (2 * FRAC)) // r                    # 2^22 / r  -> Q11 역제곱근
     if scale > QMAX:
         scale = QMAX
     y = np.empty(n, dtype=np.int64)
@@ -75,7 +75,7 @@ def rmsnorm(x_q, gain_q):
 
 
 class QModel:
-    """Quantized NamesGPT; integer forward identical to the planned RTL."""
+    """양자화된 NamesGPT; 정수 순전파가 계획된 RTL과 동일하다."""
 
     def __init__(self, sd, cfg: ModelConfig):
         self.cfg = cfg
@@ -93,10 +93,10 @@ class QModel:
         self.fc1 = qz(b + "mlp.fc1.weight")
         self.fc2 = qz(b + "mlp.fc2.weight")
         self.lm = qz("lm_head.weight")
-        self.attn_scale = q(1.0 / math.sqrt(cfg.head_dim))   # 1/sqrt(head_dim) in Q11
+        self.attn_scale = q(1.0 / math.sqrt(cfg.head_dim))   # Q11 형식의 1/sqrt(head_dim)
 
     def attn_debug(self, ctx):
-        """Return (qlast[24], k[T,24], v[T,24], attn_out[24]) for a ctx (T=len), RTL testing."""
+        """ctx(T=길이)에 대해 (qlast[24], k[T,24], v[T,24], attn_out[24]) 반환, RTL 테스트용."""
         cfg = self.cfg
         T, H, D = len(ctx), cfg.n_head, cfg.head_dim
         x = np.empty((T, cfg.n_embed), dtype=np.int64)
@@ -127,16 +127,16 @@ class QModel:
         return qlast, k, v, attn_out
 
     def logits_last(self, ctx):
-        """ctx: list of token ids (length L<=block_size, absolute positions 0..L-1).
-        Returns Q11 logits at the last position L-1 (matches incremental KV-cache decode)."""
+        """ctx: 토큰 id 리스트(길이 L<=block_size, 절대 위치 0..L-1).
+        마지막 위치 L-1의 Q11 로짓 반환(점진적 KV 캐시 디코드와 일치)."""
         cfg = self.cfg
         T, H, D = len(ctx), cfg.n_head, cfg.head_dim
-        # embeddings for all positions
+        # 모든 위치의 임베딩
         x = np.empty((T, cfg.n_embed), dtype=np.int64)
         for t in range(T):
             x[t] = np.array([sat16(int(self.tok[ctx[t]][i]) + int(self.pos[t][i]))
                              for i in range(cfg.n_embed)], dtype=np.int64)
-        # --- attention sub-layer (we only need the last position's output) ---
+        # --- 어텐션 서브레이어(마지막 위치의 출력만 필요) ---
         xn = np.array([rmsnorm(x[t], self.g1) for t in range(T)], dtype=np.int64)
         k = np.array([matvec(self.wk, xn[t]) for t in range(T)], dtype=np.int64)
         v = np.array([matvec(self.wv, xn[t]) for t in range(T)], dtype=np.int64)
@@ -160,28 +160,28 @@ class QModel:
                 attn_out[h * D + d] = sat16(tdiv(num, sum_e))
         wo = matvec(self.wo, attn_out)
         x1 = np.array([sat16(int(x[T - 1][i]) + int(wo[i])) for i in range(cfg.n_embed)], dtype=np.int64)
-        # --- MLP sub-layer ---
+        # --- MLP 서브레이어 ---
         xn2 = rmsnorm(x1, self.g2)
         h1 = matvec(self.fc1, xn2)
         h1 = np.array([hh if hh > 0 else 0 for hh in h1], dtype=np.int64)   # ReLU
         h2 = matvec(self.fc2, h1)
         x2 = np.array([sat16(int(x1[i]) + int(h2[i])) for i in range(cfg.n_embed)], dtype=np.int64)
-        # --- final norm + LM head ---
+        # --- 최종 norm + LM 헤드 ---
         xf = rmsnorm(x2, self.gf)
         return matvec(self.lm, xf)
 
 
-# ---- deterministic sampler (32-bit LCG, Numerical Recipes constants) ----------
+# ---- 결정론적 샘플러(32비트 LCG, Numerical Recipes 상수) ----------
 def lcg_next(state):
     return (state * 1664525 + 1013904223) & 0xFFFFFFFF
 
 
 def generate(model: QModel, seed, inv_temp_q11, max_len=None, greedy=False):
-    """Generate one name incrementally (absolute positions). Returns (token_ids, string)."""
+    """이름 하나를 점진적으로 생성(절대 위치). (token_ids, 문자열) 반환."""
     cfg = model.cfg
     max_len = max_len or (cfg.block_size - 1)
     rng = seed & 0xFFFFFFFF
-    seq = [0]               # start token '.'
+    seq = [0]               # 시작 토큰 '.'
     toks = []
     for _ in range(max_len):
         logits = model.logits_last(seq)
@@ -205,6 +205,6 @@ def generate(model: QModel, seed, inv_temp_q11, max_len=None, greedy=False):
         if nxt == 0:
             break
         toks.append(nxt)
-        seq.append(nxt)                 # incremental append at the next absolute position
+        seq.append(nxt)                 # 다음 절대 위치에 점진적으로 추가
     s = "".join(chr(ord("a") + t - 1) for t in toks)
     return toks, s

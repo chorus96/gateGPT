@@ -1,10 +1,10 @@
 """
-Reference char-level language model for hardware name generation.
+하드웨어 이름 생성을 위한 문자 단위 언어 모델 레퍼런스.
 
-A small decoder-only transformer (one block) written from scratch for this project.
-It is the float reference we train, then quantize to fixed point for the RTL core.
-Design choices here are ours: vocab is the delimiter '.' (id 0) plus a..z (1..26),
-RMSNorm pre-normalization, ReLU MLP, scaled dot-product causal attention.
+이 프로젝트를 위해 처음부터 작성한 작은 디코더 전용 트랜스포머(블록 1개).
+학습시키는 float 레퍼런스이며, 이후 RTL 코어를 위해 고정소수점으로 양자화한다.
+여기의 설계 선택은 우리 것: 어휘는 구분자 '.'(id 0)와 a..z(1..26),
+RMSNorm 프리-정규화, ReLU MLP, 스케일드 닷-프로덕트 코잘 어텐션.
 """
 from dataclasses import dataclass
 import torch
@@ -15,16 +15,16 @@ import torch.nn.functional as F
 @dataclass
 class ModelConfig:
     vocab_size: int = 27      # '.' + a..z
-    block_size: int = 16      # max context (also max generated length)
-    n_embed: int = 24         # model width
+    block_size: int = 16      # 최대 컨텍스트(생성 최대 길이이기도 함)
+    n_embed: int = 24         # 모델 폭
     n_head: int = 4
     head_dim: int = 6         # n_head * head_dim == n_embed
-    mlp_hidden: int = 96      # MLP inner width
+    mlp_hidden: int = 96      # MLP 내부 폭
     n_layer: int = 1
 
 
 class RMSNorm(nn.Module):
-    """Root-mean-square layer norm (no mean subtraction, no bias)."""
+    """제곱평균제곱근(RMS) 레이어 정규화(평균 차감 없음, 바이어스 없음)."""
     def __init__(self, dim, eps=1e-5):
         super().__init__()
         self.eps = eps

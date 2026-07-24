@@ -1,4 +1,4 @@
-"""Dump a matvec unit-test vector: input = ones(Q11), expected = wq @ input."""
+"""matvec 단위 테스트 벡터 덤프: 입력 = ones(Q11), 기대값 = wq @ input."""
 import os
 import numpy as np
 from model import ModelConfig
@@ -18,14 +18,14 @@ def main():
     cfg = ModelConfig()
     sd = dict(np.load(os.path.join(HERE, "weights.npz")))
     m = QModel(sd, cfg)
-    xin = np.full(cfg.n_embed, 2048, dtype=np.int64)   # all ones in Q11
+    xin = np.full(cfg.n_embed, 2048, dtype=np.int64)   # Q11에서 전부 1
     exp = matvec(m.wq, xin)
     wr("test_in.hex", xin)
     wr("test_wq.hex", exp)
     print("test_in (24):", list(xin[:4]), "...")
     print("expected wq@ones (24):", [int(v) for v in exp])
 
-    # norm test: a realistic vector (tok_embed[5] + pos_embed[3]) through rmsnorm(g1)
+    # norm 테스트: 현실적인 벡터(tok_embed[5] + pos_embed[3])를 rmsnorm(g1)에 통과
     xn = np.array([int(m.tok[5][i]) + int(m.pos[3][i]) for i in range(cfg.n_embed)], dtype=np.int64)
     xn = np.array([max(-32768, min(32767, int(v))) for v in xn], dtype=np.int64)
     nexp = rmsnorm(xn, m.g1)
@@ -33,7 +33,7 @@ def main():
     wr("test_norm_out.hex", nexp)
     print("expected rmsnorm (24):", [int(v) for v in nexp])
 
-    # exp sweep
+    # exp 스윕
     zs = list(range(0, -33000, -337)) + [-1, -2047, -2048, -2049, -32768]
     es = [exp_neg_q11(z) for z in zs]
     wr("test_exp_z.hex", np.array(zs, dtype=np.int64))

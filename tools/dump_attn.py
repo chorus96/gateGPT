@@ -1,4 +1,4 @@
-"""Dump an attention unit-test: q, K cache, V cache, expected attn_out."""
+"""어텐션 단위 테스트 덤프: q, K 캐시, V 캐시, 기대 attn_out."""
 import os
 import numpy as np
 from model import ModelConfig
@@ -18,12 +18,12 @@ def main():
     cfg = ModelConfig()
     sd = dict(np.load(os.path.join(HERE, "weights.npz")))
     m = QModel(sd, cfg)
-    # a realistic context: ".saa" left-padded
+    # 현실적인 컨텍스트: ".saa"를 왼쪽 패딩
     seq = [0, 19, 1, 1]
     ctx = [0] * (cfg.block_size - len(seq)) + seq
     q, k, v, out = m.attn_debug(ctx)
     wr("test_attn_q.hex", q)              # 24
-    wr("test_attn_k.hex", k)              # 16*24 row-major (s*24+e)
+    wr("test_attn_k.hex", k)              # 16*24 행 우선(s*24+e)
     wr("test_attn_v.hex", v)              # 16*24
     wr("test_attn_out.hex", out)          # 24
     print("attn_scale:", m.attn_scale)

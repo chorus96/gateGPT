@@ -1,11 +1,11 @@
 """
-Train the reference NamesGPT on the public makemore names corpus (data/names.txt)
-and save the float weights to tools/weights.npz.
+공개 makemore 이름 코퍼스(data/names.txt)로 레퍼런스 NamesGPT를 학습시키고
+float 가중치를 tools/weights.npz에 저장한다.
 
-Standard causal training with ABSOLUTE positions (token i always at position i), so
-inference can use an incremental KV cache (a token's K/V never change as the sequence
-grows). A name is modeled as the sequence  . n a m e .  ; at every position the net
-predicts the next token. Vocabulary: 0='.', 1..26='a'..'z'.
+절대 위치(토큰 i는 항상 위치 i)를 쓰는 표준 코잘 학습이므로, 추론에서는
+점진적 KV 캐시를 쓸 수 있다(시퀀스가 길어져도 토큰의 K/V는 변하지 않음).
+이름은 시퀀스  . n a m e .  로 모델링되며, 모든 위치에서 신경망이 다음
+토큰을 예측한다. 어휘: 0='.', 1..26='a'..'z'.
 """
 import os
 import numpy as np
@@ -26,12 +26,12 @@ def build_vocab():
 
 
 def load_dataset(cfg, stoi):
-    """Full-sequence examples (absolute positions), right-padded + masked."""
+    """전체 시퀀스 예제(절대 위치), 오른쪽 패딩 + 마스킹."""
     names = [w.strip() for w in open(os.path.join(ROOT, "data", "names.txt")) if w.strip()]
     B = cfg.block_size
     X, Y, M = [], [], []
     for w in names:
-        toks = ([0] + [stoi[c] for c in w] + [0])[: B + 1]   # .name.  (capped)
+        toks = ([0] + [stoi[c] for c in w] + [0])[: B + 1]   # .name.  (길이 제한)
         x, y = toks[:-1], toks[1:]
         L = len(x)
         X.append(x + [0] * (B - L))
@@ -57,7 +57,7 @@ def main():
         ix = torch.randint(0, n, (bs,))
         logits = model(X[ix])                                  # [bs, T, V]
         loss = F.cross_entropy(logits.reshape(-1, V), Y[ix].reshape(-1), reduction="none")
-        loss = (loss * M[ix].reshape(-1)).sum() / M[ix].sum()  # mask padding
+        loss = (loss * M[ix].reshape(-1)).sum() / M[ix].sum()  # 패딩 마스킹
         opt.zero_grad(); loss.backward(); opt.step()
         if step % 500 == 0 or step == steps - 1:
             print(f"step {step:5d}  loss {loss.item():.4f}")
@@ -66,7 +66,7 @@ def main():
     np.savez(os.path.join(HERE, "weights.npz"), **sd)
     print("saved tools/weights.npz")
 
-    # incremental float sampling (absolute positions) to sanity-check name quality
+    # 이름 품질 확인용 점진적 float 샘플링(절대 위치)
     model.eval()
     g = torch.Generator().manual_seed(7)
     for _ in range(12):
