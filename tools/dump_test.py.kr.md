@@ -32,6 +32,6 @@ flowchart TB
 4. 각 테스트의 요약을 출력.
 
 ## RTL과의 관계
-이 벡터들은 iSim의 개별 액추에이터 테스트벤치(matvec, norm, exp_unit)가 사용하는 입력/기대값으로,
+이 벡터들은 Verilator의 개별 액추에이터 테스트벤치(matvec, norm, exp_unit)가 사용하는 입력/기대값으로,
 각 프리미티브가 `fixedpoint.py`의 정수 레퍼런스와 비트 단위로 일치함을 확인합니다.
 `dump_attn.py`가 어텐션 유닛을 다루는 것과 짝을 이루는 저수준 프리미티브 테스트 덤퍼입니다.

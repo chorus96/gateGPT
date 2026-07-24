@@ -37,7 +37,7 @@ flowchart TB
 
 - **2-FF 동기화 + 디글리치**: 비동기 입력을 안정화(FILTER ~50 µs, 위상선; PUSH ~2 ms).
 - **쿼드러처 디코드**: 상태 전이 `tr = {ab_d, ab}`로 up/dn 엣지 판정, `EDGES_PER_DETENT=4`마다 한 디텐트.
-- **스타트업 홀드오프**: `STARTUP_HOLD`(~200 ms) 동안 무장 해제(전원 투입/DCM lock 안정화).
+- **스타트업 홀드오프**: `STARTUP_HOLD`(~200 ms) 동안 무장 해제(전원 투입/MMCM lock 안정화).
 - **지수적 간격**: `interval = CLK_HZ >> speed_level`, 레벨 0 = 1 Hz.
 - **기본값**: `temp_sel=2`(T=0.7), `speed_level=0`.
 

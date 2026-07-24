@@ -158,7 +158,7 @@ qlast[sl]                      # slice 객체로 인덱싱
 | `math.sqrt(x)` | 제곱근 (어텐션 스케일 `1/sqrt(head_dim)`) | QModel.__init__ |
 | `math.isqrt(n)` | **정수 제곱근**(floor) — RMSNorm의 하드웨어 isqrt와 정확히 일치 | `rmsnorm` |
 
-> `math.isqrt`는 부동소수점 오차 없이 $\lfloor\sqrt{n}\rfloor$을 반환 → RTL `isqrt.v`와 비트 일치.
+> `math.isqrt`는 부동소수점 오차 없이 $\lfloor\sqrt{n}\rfloor$을 반환 → RTL `isqrt.sv`와 비트 일치.
 
 ### 2.2 `os.path` 모듈 (파일 경로, 전반)
 

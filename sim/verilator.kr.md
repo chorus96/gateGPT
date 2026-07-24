@@ -57,7 +57,7 @@ CORE PASS: greedy + sampled match golden
 
 ## 동작 원리
 
-- **`--binary`**: Verilog 테스트벤치를 네이티브 실행 파일로 컴파일(각 `tb_*.v`가 자체 top 모듈).
+- **`--binary`**: Verilog 테스트벤치를 네이티브 실행 파일로 컴파일(각 `tb_*.sv`가 자체 top 모듈).
 - **`--timing`**: 테스트벤치의 `#delay`, `wait()`, `@(negedge clk)`, `always #5 clk = ~clk` 등
   이벤트/타이밍 구문을 지원(Verilator 5.x 기능).
 - **`-I<repo>/core`**: 코어가 `` `include "core_params.vh" `` 등으로 참조하는 생성된 `.vh`
@@ -94,7 +94,7 @@ LINT CLEAN: board top + all testbenches (-Wall)
 ### waiver 파일 `sim/gategpt.vlt`
 
 `WIDTH`(의도된 넓은 고정소수점 중간 표현식)·`PINCONNECTEMPTY`/`PINMISSING`(미사용 예비 핀,
-`udiv.rem_out`)·`UNUSEDSIGNAL`·`SYNCASYNCNET`(DCM 비동기 리셋) 등 **검토를 마친 의도된** 경고 범주는
+`udiv.rem_out`)·`UNUSEDSIGNAL`·`SYNCASYNCNET`(MMCM 비동기 리셋) 등 **검토를 마친 의도된** 경고 범주는
 Verilator 공식 waiver 파일 `sim/gategpt.vlt`로 처리합니다.
 
 - **RTL을 전혀 수정하지 않습니다** → 비트 일치·Vivado 합성에 무영향. Verilator 전용이며 Vivado 프로젝트에 포함되지 않음.

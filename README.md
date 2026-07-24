@@ -195,12 +195,12 @@ With both fixed, the board generates names correctly at 80 MHz.
 ## Layout
 
 ```
-core/         independent inference core (RTL) + generated includes (*.vh)
-board/        XUPV5 top, HD44780 LCD driver, rotary control, tokens/sec meter, UCF
+core/         independent inference core (RTL, SystemVerilog) + generated includes (*.vh)
+board/        board top, HD44780 LCD driver, rotary control, tokens/sec meter, XDC
 tools/        model, training, fixed-point reference, weight/microcode export
 data/         public makemore names corpus (training data)
 generated/    fixed-point weight ROMs (*.hex) + microcode program (ucode.hex)
-sim/          iSim testbenches (per-actuator + end-to-end golden)
+sim/          Verilator testbenches (per-actuator + end-to-end golden) + Makefile
 ```
 
 ## Build & run

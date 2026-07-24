@@ -49,7 +49,7 @@ $$
 ### 1.3 특수 토큰과 시퀀스 경계
 
 - 생성은 항상 `.`(0)에서 시작하고, 모델이 다시 `.`(0)을 내면 이름이 끝납니다.
-- 최대 길이(`block_size - 1`)에 도달해도 종료. (`generate`, `name_generator.v` 종료 조건)
+- 최대 길이(`block_size - 1`)에 도달해도 종료. (`generate`, `name_generator.sv` 종료 조건)
 
 ---
 
@@ -73,7 +73,7 @@ $$
 
 - **절대 위치**(토큰 $i$는 항상 위치 $i$)라는 선택이 LLM 관점에서 핵심입니다 → **KV 캐시**를
   가능하게 합니다(§5.3). RoPE 같은 상대 위치 대신 단순 학습 임베딩을 채택.
-- (`tools/model.py`의 `tok_embed`, `pos_embed` / `core/embed.v`)
+- (`tools/model.py`의 `tok_embed`, `pos_embed` / `core/embed.sv`)
 
 ---
 
@@ -101,7 +101,7 @@ $$
 $$
 
 - 학습 가능한 게인 $\mathbf{g}$만 유지. 하드웨어 구현이 간단하고(평균 계산 불필요) 성능 손실이 적음.
-- (`tools/model.py` RMSNorm / `core/norm.v`)
+- (`tools/model.py` RMSNorm / `core/norm.sv`)
 
 ### 3.3 잔차 연결 (Residual Connections)
 
@@ -142,7 +142,7 @@ $$
 H \times d_h = 4 \times 6 = 24 = d_\text{model}
 $$
 
-- (`tools/model.py` CausalAttention / `core/attn.v` — 헤드별 순차 처리, 헤드 내 병렬 나눗셈)
+- (`tools/model.py` CausalAttention / `core/attn.sv` — 헤드별 순차 처리, 헤드 내 병렬 나눗셈)
 
 ### 4.4 인과적 마스킹 (Causal Masking)
 
@@ -162,7 +162,7 @@ $$
 \alpha_{ij} = \frac{\exp(A_{ij} - \max_k A_{ik})}{\sum_k \exp(A_{ik} - \max_k A_{ik})}
 $$
 
-- (`core/attn.v`, `core/exp_unit.v` — 테이블+보간 exp)
+- (`core/attn.sv`, `core/exp_unit.sv` — 테이블+보간 exp)
 
 ---
 
@@ -176,7 +176,7 @@ $$
 \text{logits} = \text{RMSNorm}_f(\text{Block}(\text{Embed}(\mathbf{idx})))\, W_\text{lm} \in \mathbb{R}^{V}
 $$
 
-- (`fixedpoint.py`의 `logits_last` / `core/microgpt_core.v` 전체 마이크로코드 스케줄)
+- (`fixedpoint.py`의 `logits_last` / `core/microgpt_core.sv` 전체 마이크로코드 스케줄)
 
 ### 5.2 로짓과 LM 헤드 (Logits & LM Head)
 
@@ -195,7 +195,7 @@ $$
 - 매 스텝 새 토큰의 K/V만 계산하고 캐시된 전체 컨텍스트에 어텐션.
 - 복잡도: 순진한 전체 재계산 $O(T^2 d)$ → 증분 $O(T d)$ (스텝당). README의 **3.2× 성과**.
 - 이것이 gateGPT가 대규모 LLM 서빙과 공유하는 가장 중요한 최적화입니다.
-- (`tools/ucode_asm.py`의 KC/VC 캐시, `core/microgpt_core.v`의 `use_pos`, `name_generator.v` 루프)
+- (`tools/ucode_asm.py`의 KC/VC 캐시, `core/microgpt_core.sv`의 `use_pos`, `name_generator.sv` 루프)
 
 ### 5.4 자기회귀 생성 루프 (Generation Loop)
 
@@ -204,7 +204,7 @@ t_{i+1} \sim P(\cdot \mid t_0, \dots, t_i), \qquad t_0 = \texttt{'.'}
 $$
 
 각 반복: 로짓 계산 → 다음 토큰 샘플링/선택 → 시퀀스에 추가 → 위치 증가 → 반복. 구분자(0) 또는
-최대 길이에서 종료. (`generate`, `name_generator.v`)
+최대 길이에서 종료. (`generate`, `name_generator.sv`)
 
 ---
 
@@ -243,7 +243,7 @@ Softmax 분포에서 역-CDF(inverse-CDF) 방식으로 토큰을 추출:
 3. 누적합이 처음으로 $r$을 초과하는 토큰 선택: $\displaystyle t = \min\{k : \textstyle\sum_{v=0}^{k} e_v > r\}$
 
 - 정규화 없이 미정규화 가중치와 비교 → 하드웨어에서 나눗셈 절약.
-- (`generate` / `core/sampler.v`)
+- (`generate` / `core/sampler.sv`)
 
 ### 6.4 결정론적 난수 생성 (Deterministic RNG / LCG)
 
@@ -254,7 +254,7 @@ $$
 $$
 
 - 시드가 같으면 소프트웨어와 하드웨어가 **동일 시퀀스**를 생성 → 비트 정확 검증 가능.
-- (`lcg_next` / `sampler.v`)
+- (`lcg_next` / `sampler.sv`)
 
 ---
 
@@ -307,8 +307,8 @@ $$
 ### 8.3 비트 정확 레퍼런스 (Bit-Exact Reference)
 
 `fixedpoint.py`의 정수 QModel이 RTL이 재현해야 하는 **권위 있는 사양**입니다. 부동소수점 →
-고정소수점 Python → RTL이 동일한 연산 순서를 따라 비트 단위로 일치. iSim 골든으로 검증
-(그리디 `alaya`, 샘플 `rosphod`). (`sim/tb_core.v`)
+고정소수점 Python → RTL이 동일한 연산 순서를 따라 비트 단위로 일치. Verilator 골든으로 검증
+(그리디 `alaya`, 샘플 `rosphod`). (`sim/tb_core.sv`)
 
 ---
 
@@ -334,18 +334,18 @@ gateGPT는 규모를 극단적으로 줄였을 뿐, **디코더 전용 GPT의 �
 
 | LLM 개념 | 부동소수점 | 고정소수점 | RTL |
 |---|---|---|---|
-| 자기회귀 생성 | `train.py` 샘플링 | `generate` | `name_generator.v`, `microgpt_core.v` |
+| 자기회귀 생성 | `train.py` 샘플링 | `generate` | `name_generator.sv`, `microgpt_core.sv` |
 | 문자 토큰화 | `train.py` build_vocab | — | (id 직접 사용) |
-| 토큰/위치 임베딩 | `model.py` | QModel 임베딩 | `embed.v` |
-| RMSNorm | `model.py` RMSNorm | `rmsnorm` | `norm.v` |
-| 멀티헤드 어텐션 | `model.py` CausalAttention | `attn_debug`, `logits_last` | `attn.v` |
-| 인과적 마스킹 | `model.py` mask | (컨텍스트 길이로 암묵) | `attn.v` ctx_len |
-| Softmax | `model.py` F.softmax | `exp_neg_q11` | `exp_unit.v` |
-| MLP/ReLU | `model.py` MLP | `logits_last` | `matvec.v`, `vecop.v` |
-| LM 헤드/로짓 | `model.py` lm_head | `logits_last` | `matvec.v` (lm) |
-| KV 캐시 | — | `logits_last` (증분) | `microgpt_core.v`, `ucode_asm.py` |
-| 온도/범주형 샘플링 | `train.py` multinomial | `generate` | `sampler.v` |
-| 그리디 디코딩 | — | `generate(greedy)` | `sampler.v` |
-| 결정론적 RNG | — | `lcg_next` | `sampler.v` |
+| 토큰/위치 임베딩 | `model.py` | QModel 임베딩 | `embed.sv` |
+| RMSNorm | `model.py` RMSNorm | `rmsnorm` | `norm.sv` |
+| 멀티헤드 어텐션 | `model.py` CausalAttention | `attn_debug`, `logits_last` | `attn.sv` |
+| 인과적 마스킹 | `model.py` mask | (컨텍스트 길이로 암묵) | `attn.sv` ctx_len |
+| Softmax | `model.py` F.softmax | `exp_neg_q11` | `exp_unit.sv` |
+| MLP/ReLU | `model.py` MLP | `logits_last` | `matvec.sv`, `vecop.sv` |
+| LM 헤드/로짓 | `model.py` lm_head | `logits_last` | `matvec.sv` (lm) |
+| KV 캐시 | — | `logits_last` (증분) | `microgpt_core.sv`, `ucode_asm.py` |
+| 온도/범주형 샘플링 | `train.py` multinomial | `generate` | `sampler.sv` |
+| 그리디 디코딩 | — | `generate(greedy)` | `sampler.sv` |
+| 결정론적 RNG | — | `lcg_next` | `sampler.sv` |
 | 다음 토큰 예측 학습 | `train.py` | — | — |
 | 양자화 (PTQ) | — | `q`, QModel | (전 모듈) |

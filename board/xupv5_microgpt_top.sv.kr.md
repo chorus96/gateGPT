@@ -16,7 +16,7 @@ DIP 스위치가 랜덤 시드를 교란합니다. 코어는 80 MHz(MMCME4 ×12/
 
 ```mermaid
 flowchart TB
-    OSC(["clk_100 (100MHz)"]) --> DCM["MMCME4_BASE<br/>×12/15 → 80MHz"] --> CLK["clk (코어)"]
+    OSC(["clk_100 (100MHz)"]) --> MMCM["MMCME4_BASE<br/>×12/15 → 80MHz"] --> CLK["clk (코어)"]
     RSTBTN(["rst_btn"]) --> RSTF["동기+디바운스"] --> RESETN["resetn"]
     ROT(["rot_a/b/push"]) --> RT["rotary_throttle"]
     RT -->|"auto_start"| GEN

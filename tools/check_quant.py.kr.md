@@ -28,5 +28,5 @@ flowchart TB
 5. **골든**: 시드 2·T=0.7의 비트 정확 시퀀스(RTL이 반드시 일치해야 하는 것)를 토큰과 함께 출력.
 
 ## RTL과의 관계
-여기서 출력하는 **GOLDEN**은 `export.py`가 `core_params.vh`에 기록하고 iSim 테스트벤치가
+여기서 출력하는 **GOLDEN**은 `export.py`가 `core_params.vh`에 기록하고 Verilator 테스트벤치가
 검증하는 것과 동일한 기준입니다. 양자화 후에도 이름 품질과 결정론이 유지되는지 빠르게 확인하는 용도입니다.

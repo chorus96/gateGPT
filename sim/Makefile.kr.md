@@ -73,7 +73,7 @@ make -C sim clean      # 빌드 산출물(obj/, logs/) 삭제
 
 | 플래그 | 의미 |
 |---|---|
-| `--binary` | Verilog 테스트벤치를 네이티브 실행 파일로 컴파일(각 `tb_*.v`가 자체 top) |
+| `--binary` | Verilog 테스트벤치를 네이티브 실행 파일로 컴파일(각 `tb_*.sv`가 자체 top) |
 | `--lint-only` | 빌드 없이 정적 검사만 수행(lint 타깃) |
 | `--timing` | `#delay`, `wait()`, `@(negedge clk)`, `always #5` 등 이벤트/타이밍 구문 지원(Verilator 5.x) |
 | `-Wall` | 모든 경고 활성화(엄격) — waiver로 걸러진 것만 통과 |
@@ -85,7 +85,7 @@ make -C sim clean      # 빌드 산출물(obj/, logs/) 삭제
 RTL을 전혀 건드리지 않고 lint를 완전히 깨끗하게 유지하기 위한 Verilator 공식 waiver 파일입니다.
 `WIDTHEXPAND`/`WIDTHTRUNC`(의도된 넓은 고정소수점 중간 표현식), `PINCONNECTEMPTY`/`PINMISSING`
 (미사용 예비 핀·`udiv.rem_out`), `UNUSEDSIGNAL`/`UNUSEDPARAM`, `BLKSEQ`(함수 내 블로킹),
-`SYNCASYNCNET`(DCM 비동기 리셋), `VARHIDDEN`, `TIMESCALEMOD`, `DECLFILENAME`,
+`SYNCASYNCNET`(MMCM 비동기 리셋), `VARHIDDEN`, `TIMESCALEMOD`, `DECLFILENAME`,
 `UNSIGNED`(LCD의 CLK_HZ 파생 임계값) 범주를 각각 주석과 함께 waive합니다. Verilator 전용이며 ISE 합성엔 무영향.
 
 ## 타깃 그룹 (Targets)

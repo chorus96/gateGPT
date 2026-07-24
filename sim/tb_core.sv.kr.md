@@ -42,5 +42,5 @@ flowchart TB
 4. 에러 0이면 `CORE PASS`.
 
 ## RTL과의 관계
-`microgpt_core` 전체 경로를 검증하는 최상위 iSim 골든 테스트. Python `fixedpoint.generate`가
+`microgpt_core` 전체 경로를 검증하는 최상위 골든 테스트(Verilator). Python `fixedpoint.generate`가
 만든 시퀀스를 재현하는지 확인. README의 "iSim 오라클" 검증에 해당.

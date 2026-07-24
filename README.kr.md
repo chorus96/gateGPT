@@ -196,12 +196,12 @@ DSP 곱셈기가 각각 약 절반씩 기여합니다 — 여기에 온칩 SRAM 
 ## 레이아웃
 
 ```
-core/         독립 추론 코어(RTL) + 생성된 인클루드 (*.vh)
-board/        XUPV5 top, HD44780 LCD 드라이버, 로터리 제어, 초당 토큰 미터, UCF
+core/         독립 추론 코어(RTL, SystemVerilog) + 생성된 인클루드 (*.vh)
+board/        보드 top, HD44780 LCD 드라이버, 로터리 제어, 초당 토큰 미터, XDC
 tools/        모델, 학습, 고정소수점 레퍼런스, 가중치/마이크로코드 익스포트
 data/         공개 makemore 이름 코퍼스(학습 데이터)
 generated/    고정소수점 가중치 ROM (*.hex) + 마이크로코드 프로그램 (ucode.hex)
-sim/          iSim 테스트벤치(액추에이터별 + 엔드투엔드 골든)
+sim/          Verilator 테스트벤치(액추에이터별 + 엔드투엔드 골든) + Makefile
 ```
 
 ## 빌드 & 실행
@@ -214,15 +214,31 @@ python tools/export.py           # -> generated/*.hex, core/core_params.vh, gain
 python tools/ucode_asm.py        # -> generated/ucode.hex, core/coremap.vh
 ```
 
-골든에 대해 코어를 시뮬레이션합니다(Xilinx iSim):
+Python 골든에 대해 **Verilator**(오픈소스)로 시뮬레이션합니다:
 
 ```bash
-fuse -incremental -prj tb_core.prj -o sim/tb_core_sim work.tb_core
-./sim/tb_core_sim -tclbatch sim/isim_run.tcl     # prints CYCLES_PER_TOKEN + CORE PASS
+make -C sim            # 모든 테스트벤치 빌드+실행(전부 비트 일치 PASS)
+make -C sim lint       # -Wall 정적 lint(clean)
 ```
 
-보드 비트스트림을 빌드합니다(ISE 14.7): `xst → ngdbuild → map → par → trce → bitgen`,
-`xupv5_microgpt_top.prj` / `board/xupv5_microgpt.ucf`에 대해 파트 `xc5vlx110t-1-ff1136`로 실행.
+보드 비트스트림은 **Vivado 24.2**로 빌드합니다. RTL은 이제 SystemVerilog이며 원래의
+Virtex-5 타깃은 Vivado가 지원하지 않으므로, 보드 흐름은 **Kria K26 SOM**(Zynq
+UltraScale+ MPSoC, `xck26-sfvc784-2LV-c`; KR260 캐리어)으로 리타깃되었습니다. Virtex-5
+`DCM_BASE`는 `MMCME4_BASE`(100 MHz → 80 MHz)로, ISE `.ucf`는 `board/kr260_microgpt.xdc`로
+바뀝니다:
+
+```bash
+vivado -mode batch -source build_board_vivado_project.tcl            # synth + impl + bitstream
+vivado -mode batch -source build_board_vivado_project.tcl -tclargs noflow   # 프로젝트만 생성
+```
+
+> **Kria 특이사항:** K26에는 자유 PL 오실레이터가 없어 `clk_100`은 블록 디자인을 통해 PS
+> 패브릭 클럭 `pl_clk0`(100 MHz)에서 공급됩니다. 또한 SOM에는 온보드 스위치/LED/LCD/로터리가
+> 없어, 28개 주변장치 신호 전부를 XDC에서 KR260 SOM240 사용자 PL I/O(SOM240_1 뱅크 45 +
+> SOM240_2 뱅크 43, `LVCMOS18`)에 KR260 I/O 맵의 실제 `xck26-sfvc784` 볼로 배정했습니다 —
+> 스위치/LED/LCD/로터리를 해당 SOM240 핀(캐리어의 Pmod / 라즈베리파이 40핀 헤더로 노출)에
+> 배선하면 됩니다. 위의 측정값과 브링업 노트는 원래 Virtex-5 / ISE 14.7 빌드의 것으로
+> 역사적 기록입니다.
 
 ## 보드
 

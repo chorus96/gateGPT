@@ -182,7 +182,7 @@ $$
 
 ## 4. 고정소수점 연산 알고리즘
 
-### 4.1 행렬-벡터 곱 (Matvec, `matvec` / `core/matvec.v`)
+### 4.1 행렬-벡터 곱 (Matvec, `matvec` / `core/matvec.sv`)
 
 $$
 y_o = \text{sat}_{16}\!\left( \left( \sum_{i} \hat{W}_{o,i}\, \hat{x}_i \right) \gg \text{descale} \right)
@@ -192,7 +192,7 @@ $$
 - **타일링**: 출력 행을 LANES=24개 단위 타일로 분할. 하드웨어는 매 사이클 활성값 2개를 읽어
   레인당 2 MAC → 타일당 $\lceil \text{in\_dim}/2 \rceil$ 사이클(§6.1).
 
-### 4.2 RMSNorm의 정수 구현 (`rmsnorm` / `core/norm.v`)
+### 4.2 RMSNorm의 정수 구현 (`rmsnorm` / `core/norm.sv`)
 
 부동소수점 $1/\sqrt{\cdot}$를 **정수 isqrt + 정수 역수**로 대체:
 
@@ -205,7 +205,7 @@ $$
 수학적 근거: $\dfrac{2^{22}}{\sqrt{\text{ms}\cdot 2^{22}}/2^{11}\cdot 2^{11}} = \dfrac{1}{\sqrt{\text{ms}/2^{22}}}$
 형태로 $1/\sqrt{\text{mean}(x^2)}$의 Q11 근사가 됩니다.
 
-### 4.3 고정소수점 지수 함수 (`exp_neg_q11` / `core/exp_unit.v`)
+### 4.3 고정소수점 지수 함수 (`exp_neg_q11` / `core/exp_unit.sv`)
 
 $z \le 0$ (Q11)에 대해 $e^z$를 **17개 항목 테이블 + 선형 보간**으로 계산:
 
@@ -235,7 +235,7 @@ $$
 
 ## 5. 어텐션·디코딩 수학
 
-### 5.1 헤드별 어텐션 계산 (`attn_debug`, `logits_last` / `core/attn.v`)
+### 5.1 헤드별 어텐션 계산 (`attn_debug`, `logits_last` / `core/attn.sv`)
 
 헤드 $h$의 슬라이스 $\text{sl} = [h\,d_h, (h{+}1)d_h)$에 대해:
 
@@ -260,9 +260,9 @@ $$
 
 ---
 
-## 6. 하드웨어 산술 알고리즘 (`core/*.v`)
+## 6. 하드웨어 산술 알고리즘 (`core/*.sv`)
 
-### 6.1 병렬 곱셈-누산 타일 (Systolic MAC Tile, `core/matvec.v`)
+### 6.1 병렬 곱셈-누산 타일 (Systolic MAC Tile, `core/matvec.sv`)
 
 $$
 \text{acc}[L] \mathrel{+}= \hat{x}_{2j}\cdot \hat{W}_{L,2j} + \hat{x}_{2j+1}\cdot \hat{W}_{L,2j+1}
@@ -270,7 +270,7 @@ $$
 
 - 레인 $L = 0,\dots,23$가 병렬로, 사이클당 2열씩 처리. 48개 DSP48E 사용(§8).
 
-### 6.2 정수 제곱근 (`core/isqrt.v`)
+### 6.2 정수 제곱근 (`core/isqrt.sv`)
 
 $\text{root} = \lfloor \sqrt{n} \rfloor$을 **비트-페어(비복원) 알고리즘**으로 계산. $W$비트 → $W/2$ 사이클.
 4의 거듭제곱 비트마스크 $b_k = 4^k$를 상위부터 내려가며:
@@ -284,7 +284,7 @@ $$
 
 Python `math.isqrt`와 비트 동일. 근거: $(\text{res}+b_k)^2$의 자릿수별 전개로 제곱근을 한 비트씩 결정.
 
-### 6.3 Radix-4 정수 나눗셈 (`core/udiv.v`)
+### 6.3 Radix-4 정수 나눗셈 (`core/udiv.sv`)
 
 부호 없는 복원(restoring) 나눗셈, **사이클당 몫 2비트**(radix-4). MSB부터 부분 나머지를 4배 시프트하며
 다음 두 비트를 내려받고, 몫 자릿수 $q_d \in \{0,1,2,3\}$을 선택:
@@ -302,7 +302,7 @@ $$
 
 ---
 
-## 7. 샘플링 수학 (`generate` / `core/sampler.v`)
+## 7. 샘플링 수학 (`generate` / `core/sampler.sv`)
 
 ### 7.1 온도 스케일링 (Temperature Scaling)
 
@@ -345,7 +345,7 @@ $$
 \text{rng}_{n+1} = (1664525 \cdot \text{rng}_n + 1013904223) \bmod 2^{32}
 $$
 
-`lcg_next()`와 `sampler.v`가 동일. 결정론적이므로 소프트웨어 골든과 비트 일치.
+`lcg_next()`와 `sampler.sv`가 동일. 결정론적이므로 소프트웨어 골든과 비트 일치.
 
 ---
 
@@ -371,15 +371,24 @@ $$
 
 ---
 
-## 9. 보드 주변장치 수학 (`board/*.v`)
+## 9. 보드 주변장치 수학 (`board/*.sv`)
 
-### 9.1 클럭 합성 (DCM CLKFX)
+### 9.1 클럭 합성 (MMCME4)
+
+`MMCME4_BASE`는 먼저 VCO를 올린 뒤 분주한다(UltraScale+ VCO 범위 800~1600 MHz):
 
 $$
-f_\text{core} = f_\text{osc} \cdot \frac{\text{CLKFX\_MULTIPLY}}{\text{CLKFX\_DIVIDE}} = 100\,\text{MHz} \cdot \frac{4}{5} = 80\,\text{MHz}
+f_\text{VCO} = f_\text{in} \cdot \frac{\text{CLKFBOUT\_MULT\_F}}{\text{DIVCLK\_DIVIDE}} = 100\,\text{MHz} \cdot \frac{12}{1} = 1200\,\text{MHz}
 $$
 
-### 9.2 이진화 십진수(BCD) 카운팅 (`tok_meter.v`)
+$$
+f_\text{core} = \frac{f_\text{VCO}}{\text{CLKOUT0\_DIVIDE\_F}} = \frac{1200\,\text{MHz}}{15} = 80\,\text{MHz}
+$$
+
+> 원래 Virtex-5 설계는 `DCM_BASE`의 CLKFX(×4/5)로 100 → 80 MHz를 만들었으나, Kria K26
+> 리타깃으로 `MMCME4_BASE`(×12/15)로 대체됨.
+
+### 9.2 이진화 십진수(BCD) 카운팅 (`tok_meter.sv`)
 
 이진→십진 나눗셈을 피하려 처음부터 BCD 리플 캐리로 계수. 자릿수 $d_k$가 9에서 넘칠 때 캐리 전파:
 
@@ -389,7 +398,7 @@ $$
 
 XST가 2의 거듭제곱으로만 나누므로 임의 상수 나눗셈을 회피하는 기법입니다.
 
-### 9.3 쿼드러처 디코딩 (`rotary_throttle.v`)
+### 9.3 쿼드러처 디코딩 (`rotary_throttle.sv`)
 
 로터리 엔코더의 두 위상 신호 $A, B$의 그레이 코드 전이로 회전 방향을 판정. 상태 전이
 $\text{tr} = \{A_{n-1}B_{n-1}, A_n B_n\}$에서 특정 패턴이 up/down 엣지를 나타내며,
@@ -400,7 +409,7 @@ $$
 |\text{acc}| \ge 3 \Rightarrow \text{한 디텐트 완료}
 $$
 
-### 9.4 지수적 회전 간격 (`rotary_throttle.v`)
+### 9.4 지수적 회전 간격 (`rotary_throttle.sv`)
 
 자동 생성 간격을 레벨에 따라 지수적으로 단축(비트 시프트로 2의 거듭제곱 나눗셈):
 
@@ -423,7 +432,7 @@ $$
 - 난수는 §7.4의 결정론적 LCG.
 
 이로써 시뮬레이션 골든(그리디 `alaya`, 시드 2·$\tau{=}0.7$ 샘플 `rosphod`)이 소프트웨어와
-하드웨어에서 동일하게 재현됩니다(`sim/tb_core.v`).
+하드웨어에서 동일하게 재현됩니다(`sim/tb_core.sv`).
 
 ---
 
@@ -431,14 +440,14 @@ $$
 
 | 수학 개념 | 부동소수점 | 고정소수점 | RTL |
 |---|---|---|---|
-| 임베딩 | `model.py` NamesGPT | `fixedpoint.py` QModel | `embed.v` |
-| RMSNorm | `model.py` RMSNorm | `rmsnorm` | `norm.v`, `isqrt.v`, `udiv.v` |
-| 어텐션 | `model.py` CausalAttention | `attn_debug` | `attn.v`, `exp_unit.v`, `udiv.v` |
-| MLP/ReLU | `model.py` MLP | `logits_last` | `matvec.v`, `vecop.v` |
-| 행렬-벡터 곱 | (torch Linear) | `matvec` | `matvec.v`, `wrom.v` |
-| Softmax | (torch) | `exp_neg_q11` | `exp_unit.v` |
-| 샘플링/LCG | — | `generate`, `lcg_next` | `sampler.v` |
+| 임베딩 | `model.py` NamesGPT | `fixedpoint.py` QModel | `embed.sv` |
+| RMSNorm | `model.py` RMSNorm | `rmsnorm` | `norm.sv`, `isqrt.sv`, `udiv.sv` |
+| 어텐션 | `model.py` CausalAttention | `attn_debug` | `attn.sv`, `exp_unit.sv`, `udiv.sv` |
+| MLP/ReLU | `model.py` MLP | `logits_last` | `matvec.sv`, `vecop.sv` |
+| 행렬-벡터 곱 | (torch Linear) | `matvec` | `matvec.sv`, `wrom.sv` |
+| Softmax | (torch) | `exp_neg_q11` | `exp_unit.sv` |
+| 샘플링/LCG | — | `generate`, `lcg_next` | `sampler.sv` |
 | 교차 엔트로피/AdamW | `train.py` | — | — |
 | 양자화 | — | `q`, `sat16`, `tdiv` | (전 모듈) |
 | 자원/처리량 추정 | — | — | `README.md` |
-| BCD/쿼드러처/클럭 | — | — | `tok_meter.v`, `rotary_throttle.v`, `xupv5_microgpt_top.v` |
+| BCD/쿼드러처/클럭 | — | — | `tok_meter.sv`, `rotary_throttle.sv`, `xupv5_microgpt_top.sv` |

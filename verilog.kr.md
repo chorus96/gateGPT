@@ -1,6 +1,6 @@
 # gateGPT에서 사용한 Verilog 문법 정리
 
-이 문서는 gateGPT 저장소의 `core/*.v`, `board/*.v`, `sim/*.v`에서 사용한 **모든 Verilog 문법**을
+이 문서는 gateGPT 저장소의 `core/*.sv`, `board/*.sv`, `sim/*.sv`에서 사용한 **모든 Verilog 문법**을
 상세히 정리합니다. 각 문법이 어느 파일에 쓰였는지도 함께 표기합니다.
 
 > **참고 (SystemVerilog 이관):** `core/`·`board/`의 RTL은 이후 **SystemVerilog**로 변환되었습니다
@@ -266,7 +266,7 @@ endfunction
 | 함수 내부 지역 변수 | `reg` 선언 후 계산 | `attn`, `lcd` |
 
 > **핵심 설계**: 모든 ROM을 `$readmemh` 대신 **조합 case 함수**로 구현 — XST 14.7이 작은
-> `$readmemh` 분산 ROM을 0으로 묶는 버그를 회피. (생성된 `core/*.vh`, `wrom.v`/`grom.v`/`embed.v`/`exp_unit.v`에서 include)
+> `$readmemh` 분산 ROM을 0으로 묶는 버그를 회피. (생성된 `core/*.vh`, `wrom.sv`/`grom.sv`/`embed.sv`/`exp_unit.sv`에서 include)
 
 ---
 
@@ -302,7 +302,7 @@ vmem2 #(.AW(10), .DW(16)) u_vmem (.clk(clk),
 | **명명 포트 연결** `.port(signal)` | 순서 무관 연결 | 전반 |
 | **파라미터 오버라이드** `#(.AW(10))` | 인스턴스별 파라미터 | 전반 |
 | 미연결 포트 `.busy()` | 출력 무시 | `attn`, `norm` udiv |
-| Xilinx 프리미티브 인스턴스 | `IBUFG`, `BUFG`, `DCM_BASE` | `top` |
+| Xilinx 프리미티브 인스턴스 | `BUFG`, `MMCME4_BASE` | `top` |
 
 ---
 
@@ -347,7 +347,7 @@ vmem2 #(.AW(10), .DW(16)) u_vmem (.clk(clk),
 
 ---
 
-## 12. 테스트벤치 전용 문법 (`sim/*.v`)
+## 12. 테스트벤치 전용 문법 (`sim/*.sv`)
 
 ### 12.1 `initial`과 시간 제어
 
@@ -483,8 +483,8 @@ else if (sb_cnt >= FILTER) sb_clean <= sb_sync[1];   // 안정 후 채택
 | 부호 있는 고정소수점 산술(`>>>`, `$signed`, 포화) | 전 core 모듈 |
 | 부분 선택 `[a +: b]` | `matvec`, `xupv5_microgpt_top` |
 | 컴파일러 지시자 (`include`/`ifdef`) | `microgpt_core`, `xupv5_microgpt_top` |
-| 테스트벤치 (`initial`/`task`/`$readmemh`/`$display`) | `sim/tb_*.v` 전반 |
-| Xilinx 프리미티브 (`DCM_BASE`/`BUFG`) | `xupv5_microgpt_top` |
+| 테스트벤치 (`initial`/`task`/`$readmemh`/`$display`) | `sim/tb_*.sv` 전반 |
+| Xilinx 프리미티브 (`MMCME4_BASE`/`BUFG`) | `xupv5_microgpt_top` |
 
 ---
 
@@ -493,7 +493,7 @@ else if (sb_cnt >= FILTER) sb_clean <= sb_sync[1];   // 안정 후 채택
 이 장은 저장소의 RTL이 **하드웨어로 구현한 알고리즘**을 파일별로 상세히 정리합니다. 각 알고리즘의
 동작 원리, 상태 흐름, 사이클 복잡도, 핵심 최적화를 포함합니다. (개념적 수식은 `math.kr.md` 참조)
 
-## 14.1 마이크로코드 시퀀서 (`microgpt_core.v`)
+## 14.1 마이크로코드 시퀀서 (`microgpt_core.sv`)
 
 **알고리즘**: 프로그램 카운터(`pc`)가 조합 ROM 함수 `ucode_rom(pc)`에서 72비트 매크로 명령을 페치 →
 필드를 디코드해 해당 액추에이터에 `go` 펄스 → `act_done`을 기다렸다가 `pc++` → 반복. `OP_HALT`에서 종료.
@@ -504,7 +504,7 @@ else if (sb_cnt >= FILTER) sb_clean <= sb_sync[1];   // 안정 후 채택
 - 17개 명령이 한 토큰의 전체 트랜스포머 스케줄(embed → norm → K/V/Q matvec → attn → wo →
   잔차 → norm → fc1 → relu → fc2 → 잔차 → norm → lm → sample)을 인코딩.
 
-## 14.2 타일드 병렬 행렬-벡터 (`matvec.v`)
+## 14.2 타일드 병렬 행렬-벡터 (`matvec.sv`)
 
 **알고리즘**: 출력 행을 LANES=24개 단위 타일로 나누고, 각 타일을 systolic MAC로 계산:
 
@@ -517,7 +517,7 @@ else if (sb_cnt >= FILTER) sb_clean <= sb_sync[1];   // 안정 후 채택
 - **최적화**: 2단 오퍼랜드 파이프(`w_rdata_rr`, `rd_a_r`)로 BRAM→DSP 넷을 크리티컬 패스에서 제거.
 - **복잡도**: 타일당 ≈ `in_dim/2 + LANES/2` 사이클. 48개 DSP48E 사용(바인딩 리소스).
 
-## 14.3 RMSNorm 엔진 (`norm.v`)
+## 14.3 RMSNorm 엔진 (`norm.sv`)
 
 **알고리즘**: 6-상태 FSM으로 정규화를 순차 계산.
 
@@ -530,7 +530,7 @@ else if (sb_cnt >= FILTER) sb_clean <= sb_sync[1];   // 안정 후 채택
 - **자원 공유**: 하나의 `udiv`를 두 나눗셈에 재사용, `isqrt`는 좁은 32비트.
 - **복잡도**: 약 `N/2`(합) + 나눗셈/제곱근 지연 + `N/2`(스케일) 사이클.
 
-## 14.4 단일 위치 멀티헤드 어텐션 (`attn.v`)
+## 14.4 단일 위치 멀티헤드 어텐션 (`attn.sv`)
 
 **알고리즘**: 헤드마다 8-페이즈 FSM을 순회.
 
@@ -544,7 +544,7 @@ else if (sb_cnt >= FILTER) sb_clean <= sb_sync[1];   // 안정 후 채택
 - **핵심 최적화**: 한 헤드의 6개 출력이 같은 분모를 공유하므로 병렬 나눗셈으로 처리(스테이지 4, 44,919 tok/s).
 - **read-ahead**: 지연 인덱스(`s_d`, `d_d`)로 등록 읽기의 1사이클 지연을 정렬.
 
-## 14.5 고정소수점 지수 (`exp_unit.v`)
+## 14.5 고정소수점 지수 (`exp_unit.sv`)
 
 **알고리즘**: 파이프라인(지연 1) 테이블 + 선형 보간.
 
@@ -554,7 +554,7 @@ else if (sb_cnt >= FILTER) sb_clean <= sb_sync[1];   // 안정 후 채택
 
 - 감소 함수 테이블(17항목)에 구간 선형 보간 → 곱셈 1회. 파이프 컷으로 Fmax 개선.
 
-## 14.6 정수 제곱근 (`isqrt.v`)
+## 14.6 정수 제곱근 (`isqrt.sv`)
 
 **알고리즘**: 비트-페어(비복원) 제곱근, W/2 사이클.
 
@@ -562,7 +562,7 @@ else if (sb_cnt >= FILTER) sb_clean <= sb_sync[1];   // 안정 후 채택
   크면 `op -= res+bitm`, `res = (res>>1)+bitm`; 작으면 `res >>= 1`. `bitm >>= 2`.
 - 마지막 사이클에서 최종 $\lfloor\sqrt{\cdot}\rfloor$을 `root`에 노출. Python `math.isqrt`와 비트 일치.
 
-## 14.7 Radix-4 정수 나눗셈 (`udiv.v`)
+## 14.7 Radix-4 정수 나눗셈 (`udiv.sv`)
 
 **알고리즘**: 복원 나눗셈, MSB 우선, **사이클당 몫 2비트**, W/2 사이클.
 
@@ -571,7 +571,7 @@ else if (sb_cnt >= FILTER) sb_clean <= sb_sync[1];   // 안정 후 채택
 - `rem = rshift - qd·den`, `q = {q, qd}`. `den=0`이면 all-ones 가드.
 - radix-2와 **비트 동일한** floor 몫·나머지를 절반 사이클에 산출(스테이지 5, 51,914 tok/s). 나머지는 샘플러 모듈로에 재사용.
 
-## 14.8 토큰 샘플러 (`sampler.v`)
+## 14.8 토큰 샘플러 (`sampler.sv`)
 
 **알고리즘**: 5-상태 FSM, 그리디 또는 온도 softmax 범주형.
 
@@ -583,24 +583,24 @@ else if (sb_cnt >= FILTER) sb_clean <= sb_sync[1];   // 안정 후 채택
 
 - **LCG**: `rng·1664525 + 1013904223`. 결정론적 → 소프트웨어 골든과 비트 일치.
 
-## 14.9 임베딩 조회 (`embed.v`)
+## 14.9 임베딩 조회 (`embed.sv`)
 
 **알고리즘**: `tbase=token·N_EMBED`, `pbase=pos·N_EMBED`로 두 ROM을 인덱싱해
 `sat16(tok_emb + pos_emb)`를 `dst_base+i`에 순차 기록(N_EMBED 사이클). 조합 case 함수 ROM 사용.
 
-## 14.10 원소별 벡터 연산 (`vecop.v`)
+## 14.10 원소별 벡터 연산 (`vecop.sv`)
 
 **알고리즘**:
 - **ADD**: `S_LOADA`에서 벡터 a를 `areg` 캐시에 읽어들인 뒤(read-ahead), `S_COMB`에서 b를
   스트리밍하며 `sat16(a+b)` 기록(잔차 덧셈).
 - **RELU**: 캐시 생략, `S_COMB`에서 a를 스트리밍하며 `v_rdata[15] ? 0 : v_rdata` 기록.
 
-## 14.11 듀얼 포트 스크래치패드 접근 (`vmem.v`, `vmem2.v`)
+## 14.11 듀얼 포트 스크래치패드 접근 (`vmem.sv`, `vmem2.sv`)
 
 **알고리즘**: 등록 읽기 BRAM. `vmem`은 1읽기+1쓰기, `vmem2`는 진정한 듀얼 포트(포트당 독립 always).
 액추에이터가 주소를 한 사이클 먼저 제시하고 다음 사이클 데이터 소비(read-ahead) → 2읽기 또는 2쓰기/사이클.
 
-## 14.12 자기회귀 이름 생성 루프 (`name_generator.v`)
+## 14.12 자기회귀 이름 생성 루프 (`name_generator.sv`)
 
 **알고리즘**: 4-상태 FSM(`G_IDLE`/`G_FIRE`/`G_WAIT`/`G_DONE`).
 
@@ -608,7 +608,7 @@ else if (sb_cnt >= FILTER) sb_clean <= sb_sync[1];   // 안정 후 채택
   결과 토큰을 다음 입력으로 피드백, `pos++`, `rng=core_rng`.
 - 구분자(0) 또는 `pos==MAX_LEN-1`에서 종료. `name_buf`에 `token-1`을 저장(표시 매핑).
 
-## 14.13 HD44780 LCD 컨트롤러 (`lcd_hd44780.v`)
+## 14.13 HD44780 LCD 컨트롤러 (`lcd_hd44780.sv`)
 
 **알고리즘**: 이중 FSM.
 
@@ -618,7 +618,7 @@ else if (sb_cnt >= FILTER) sb_clean <= sb_sync[1];   // 안정 후 채택
   `is_nibble`이면 상위 니블만(8→4비트 전환).
 - **tear-free**: 프레임 시작 시 `l1_buf`/`l2_buf`로 스냅샷. 모든 지연은 `CLK_HZ` 파생(실시간).
 
-## 14.14 로터리 쿼드러처 디코드 + 디바운스 (`rotary_throttle.v`)
+## 14.14 로터리 쿼드러처 디코드 + 디바운스 (`rotary_throttle.sv`)
 
 **알고리즘**:
 - **동기화+디글리치**: 비동기 A/B/push를 2-FF 동기화 후 카운터로 안정화(FILTER 사이클).
@@ -628,19 +628,20 @@ else if (sb_cnt >= FILTER) sb_clean <= sb_sync[1];   // 안정 후 채택
 - **지수적 간격**: `interval = CLK_HZ >> speed_level`, `timer`가 만료되고 코어가 idle이면 `auto_start` 펄스.
 - **스타트업 홀드오프**: `STARTUP_HOLD`(~200ms) 동안 무장 해제.
 
-## 14.15 BCD 초당 토큰 미터 (`tok_meter.v`)
+## 14.15 BCD 초당 토큰 미터 (`tok_meter.sv`)
 
 **알고리즘**: 이진→십진 나눗셈 없이 처음부터 BCD 리플 캐리로 계수.
 
 - `token_valid`마다 `d0`++, 9에서 넘치면 상위 자릿수로 캐리 전파(`d0→d1→d2→d3→d4`).
 - `at_cap`(99999)에서 포화. `sec_timer`가 `CLK_HZ-1`에 도달하면 `tok_bcd`에 5자리 발행 후 리셋.
 
-## 14.16 클럭 합성·리셋·버튼 디바운스 (`xupv5_microgpt_top.v`)
+## 14.16 클럭 합성·리셋·버튼 디바운스 (`xupv5_microgpt_top.sv`)
 
 **알고리즘**:
-- **DCM 클럭 합성**: `DCM_BASE`의 CLKFX(×4/5)로 100 MHz → 80 MHz, CLK0 피드백으로 deskew/lock.
+- **MMCM 클럭 합성**: `MMCME4_BASE`로 100 MHz → 80 MHz(×12/15: VCO 1200 MHz), `BUFG` 피드백으로
+  deskew/lock. (원래 Virtex-5 `DCM_BASE` CLKFX ×4/5를 대체.)
 - **리셋 디바운스**: `rst_btn`을 2-FF 동기화 후 `RST_FILTER`(~2ms) 안정 시 동기 리셋 갱신,
-  DCM lock까지 리셋 유지.
+  MMCM lock까지 리셋 유지.
 - **버튼 디바운스**: `start_btn`을 같은 방식으로 걸러 상승 엣지 펄스 생성(단, 이 보드에선 트리거로 미사용).
 - **1 Hz 하트비트**: 카운터로 0.5초마다 토글해 `led[7]`에 클럭 검증 표시.
 
