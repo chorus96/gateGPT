@@ -66,3 +66,11 @@ fuseRelaunch.cmd
 sim/obj/
 sim/logs/
 obj_dir/
+
+# Vivado build artifacts
+vivado_prj/
+*.jou
+*.str
+.Xil/
+vivado*.log
+usage_statistics_webtalk.*

@@ -1,6 +1,6 @@
 // xupv5_microgpt_top을 위한 보드 레벨(TOP) 테스트벤치.
 //
-// 보드 전체를 시뮬레이션함 -- DCM/클럭 버퍼(sim/xilinx_stubs.sv의 동작 stub), 리셋/버튼
+// 보드 전체를 시뮬레이션함 -- MMCM/클럭 버퍼(sim/xilinx_stubs.sv의 동작 stub), 리셋/버튼
 // 디바운스, 로터리 스로틀, 이름 생성기(코어), HD44780 LCD 드라이버, 초당 토큰 미터 --
 // Xilinx UniSim 라이브러리 없이, 따라서 Verilator나 iverilog에서 실행됨.
 //
@@ -68,9 +68,9 @@ module tb_top;
         // 짧은 펄스 후 리셋 해제
         repeat (30) @(posedge clk); rst_btn = 1'b0;
 
-        // DCM lock (stub이 RST 해제 몇 사이클 뒤 어서트)
-        wait (dut.dcm_locked);
-        $display("[cycle %0d] DCM locked", cyc);
+        // MMCM lock (stub이 RST 해제 몇 사이클 뒤 어서트)
+        wait (dut.mmcm_locked);
+        $display("[cycle %0d] MMCM locked", cyc);
 
         // 로터리 스타트업 홀드가 만료될 때까지 대기한 뒤, 속도를 최대로 올림
         wait (dut.u_rot.armed);
@@ -90,12 +90,12 @@ module tb_top;
         // 기본 정상성 검사
         if (cap_len < 5'd1 || cap_len > 5'd16)
             $display("TOP FAIL: implausible name length %0d", cap_len);
-        else if (dut.dcm_locked !== 1'b1)
-            $display("TOP FAIL: DCM not locked");
+        else if (dut.mmcm_locked !== 1'b1)
+            $display("TOP FAIL: MMCM not locked");
         else begin
             // LCD/미터를 조금 더 동작시킨 뒤 통과
             repeat (2000) @(posedge clk);
-            $display("TOP PASS: board booted (DCM locked, LCD driving) and generated a name");
+            $display("TOP PASS: board booted (MMCM locked, LCD driving) and generated a name");
         end
         $finish;
     end

@@ -5,10 +5,12 @@
 // TEMP 모드에서 led[5] 점등; LCD 2행은 활성 설정("rate: NNNNN t/s" 또는 "temp: X.Y")을
 // 표시. DIP 스위치는 랜덤 시드를 교란함.
 //
-// PC 측(USB JTAG 케이블): 선택적 ChipScope VIO 코어 (CHIPSCOPE_VIO).
+// PC 측(USB JTAG 케이블): 선택적 ChipScope/ILA VIO 코어 (CHIPSCOPE_VIO).
 //
-// 코어는 80 MHz(DCM CLKFX x4/5)로 동작. Post-PAR에서 80.24 MHz, 타이밍 에러 0으로 클로징.
-// (SystemVerilog)
+// 코어는 80 MHz로 동작(MMCME2 x8/10: 100 MHz -> VCO 800 MHz -> 80 MHz).
+// 원래 설계는 Virtex-5 + ISE 14.7(DCM CLKFX x4/5, post-PAR 80.24 MHz)이었으나,
+// Vivado는 Virtex-5를 지원하지 않으므로 Artix-7(xc7a100t)로 리타깃됨.
+// (SystemVerilog, Vivado 24.2 / 7-series)
 module xupv5_microgpt_top (
     input  logic        clk_100,      // 100 MHz 보드 오실레이터
     input  logic        rst_btn,      // 리셋 푸시 버튼 (active high)
@@ -30,24 +32,26 @@ module xupv5_microgpt_top (
     // 합성은 기본값을 유지하므로 보드 동작은 변하지 않음.
     parameter int CLK_HZ = 80_000_000;   // 코어는 DCM CLKFX (100*4/5) = 80 MHz로 동작
 
-    // ---------------- 클럭킹: 100 MHz osc -> DCM CLKFX (x4/5) -> 80 MHz 코어 -----
-    // block-RAM + 파이프라인 재작업 후 코어는 합성 후 ~89 MHz; post-PAR에서 80.24 MHz
-    // (12.462 ns, 타이밍 에러 0)로 클로징. CLK0은 DCM 피드백.
-    wire clk100_g, clk0, clk0_g, clkfx, clk, dcm_locked;
-    IBUFG u_ibufg (.I(clk_100), .O(clk100_g));
-    DCM_BASE #(
-        .CLKIN_PERIOD(10.0),
-        .CLKFX_MULTIPLY(4),      // CLKFX = 100 MHz * 4/5 = 80 MHz
-        .CLKFX_DIVIDE(5)
-    ) u_dcm (
-        .CLKIN(clk100_g), .CLKFB(clk0_g), .RST(rst_btn),
-        .CLK0(clk0), .CLKFX(clkfx),
-        .CLK90(), .CLK180(), .CLK270(),
-        .CLK2X(), .CLK2X180(), .CLKDV(), .CLKFX180(),
-        .LOCKED(dcm_locked)
+    // ---------------- 클럭킹: 100 MHz osc -> MMCME2 -> 80 MHz 코어 (7-series) -----
+    // MMCME2_BASE: 100 MHz * (CLKFBOUT_MULT_F=8 / DIVCLK_DIVIDE=1) = VCO 800 MHz,
+    // CLKOUT0 = 800 / CLKOUT0_DIVIDE_F=10 = 80 MHz. Vivado가 clk_100 입력에 IBUF를 추론함.
+    // (원래 Virtex-5 DCM_BASE CLKFX x4/5 를 대체.)
+    wire clk, clkfb, clkfb_bufg, clk80, mmcm_locked;
+    MMCME2_BASE #(
+        .CLKIN1_PERIOD(10.0),          // 100 MHz 입력
+        .DIVCLK_DIVIDE(1),
+        .CLKFBOUT_MULT_F(8.0),         // VCO = 100 * 8 = 800 MHz (600..1200 범위)
+        .CLKOUT0_DIVIDE_F(10.0)        // CLKOUT0 = 800 / 10 = 80 MHz
+    ) u_mmcm (
+        .CLKIN1(clk_100), .RST(rst_btn), .PWRDWN(1'b0),
+        .CLKFBIN(clkfb_bufg), .CLKFBOUT(clkfb), .CLKFBOUTB(),
+        .CLKOUT0(clk80), .CLKOUT0B(),
+        .CLKOUT1(), .CLKOUT1B(), .CLKOUT2(), .CLKOUT2B(),
+        .CLKOUT3(), .CLKOUT3B(), .CLKOUT4(), .CLKOUT5(), .CLKOUT6(),
+        .LOCKED(mmcm_locked)
     );
-    BUFG u_bufg0  (.I(clk0),  .O(clk0_g));   // CLK0 피드백 (DCM deskew/lock)
-    BUFG u_bufgfx (.I(clkfx), .O(clk));      // 코어 클럭 = CLKFX = 80 MHz
+    BUFG u_bufgfb (.I(clkfb), .O(clkfb_bufg));   // MMCM 피드백 경로
+    BUFG u_bufg0  (.I(clk80), .O(clk));          // 코어 클럭 = 80 MHz
 
     // ---------------- 리셋 버튼: 동기 + 디바운스 -------------------------------
     // rst_btn은 누름/뗌 시 바운스함; 동기 리셋을 바꾸기 전에 레벨이 RST_FILTER(~2 ms)
@@ -63,7 +67,7 @@ module xupv5_microgpt_top (
         else if (rb_cnt >= RST_FILTER)     begin rb_clean <= rb_sync[1]; rb_cnt <= 18'd0; end
         else                               rb_cnt <= rb_cnt + 18'd1;
     end
-    wire resetn = dcm_locked & ~rb_clean;
+    wire resetn = mmcm_locked & ~rb_clean;
 
     // ---------------- start 버튼: 동기 + 디글리치 + 1사이클 엣지 --------------
     // 커서 버튼 라인이 글리치를 일으켜 초당 ~66회 허위 누름을 발생시켰음(정지 시 ~330 t/s

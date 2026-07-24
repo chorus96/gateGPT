@@ -53,7 +53,7 @@ CORE PASS: greedy + sampled match golden
 | `tb_norm` | `norm` + `grom` + `udiv` + `isqrt` | `generated/test_norm_*.hex` |
 | `tb_attn` | `attn` + `exp_unit` + `udiv` + `vmem` | `generated/test_attn_*.hex` |
 | `tb_core` | 전체 `microgpt_core` 엔드투엔드 | `core/*.vh` (마이크로코드/가중치) |
-| `tb_top`  | **보드 최상위** `xupv5_microgpt_top` (DCM·리셋·로터리·LCD·미터+코어) | 내부 자기생성 이름 |
+| `tb_top`  | **보드 최상위** `xupv5_microgpt_top` (MMCM·리셋·로터리·LCD·미터+코어) | 내부 자기생성 이름 |
 
 ## 동작 원리
 
@@ -76,7 +76,7 @@ CORE PASS: greedy + sampled match golden
    Verilator는 파일이 배열보다 크면 치명 오류를 내고, 미사용 항목의 `x` 센티넬을
    보존하지 않으므로 정확한 개수로 맞췄습니다.
 
-이 변경들은 ISE(iSim) 흐름과도 호환됩니다(상대 경로 검색은 XST에서도 동작).
+원래 흐름은 ISE 14.7(iSim)이었으나 현재는 Vivado 24.2로 전환됨(아래 참조).
 
 ## Lint (정적 검사) — 완전히 깨끗한 `-Wall`
 
@@ -97,7 +97,7 @@ LINT CLEAN: board top + all testbenches (-Wall)
 `udiv.rem_out`)·`UNUSEDSIGNAL`·`SYNCASYNCNET`(DCM 비동기 리셋) 등 **검토를 마친 의도된** 경고 범주는
 Verilator 공식 waiver 파일 `sim/gategpt.vlt`로 처리합니다.
 
-- **RTL을 전혀 수정하지 않습니다** → 비트 일치·ISE 합성에 무영향. Verilator 전용이며 ISE 프로젝트에 포함되지 않음.
+- **RTL을 전혀 수정하지 않습니다** → 비트 일치·Vivado 합성에 무영향. Verilator 전용이며 Vivado 프로젝트에 포함되지 않음.
 - 빌드(`--binary`)와 lint(`--lint-only`) 모두 이 waiver를 사용하므로, 별도의 `-Wno-*` 플래그 없이도
   `-Wall`이 깨끗하게 통과합니다.
 - 각 waiver에는 왜 무해한지 주석이 달려 있습니다. 모든 테스트벤치가 Python 레퍼런스와 **비트 단위로 일치**합니다.
@@ -110,14 +110,15 @@ Verilator 공식 waiver 파일 `sim/gategpt.vlt`로 처리합니다.
 
 ### 1. Xilinx 프리미티브 stub (`sim/xilinx_stubs.sv`)
 
-TOP은 Virtex-5 클럭 프리미티브 `IBUFG`, `BUFG`, `DCM_BASE`를 인스턴스화하는데, Verilator/iverilog에는
-Xilinx UniSim 라이브러리가 없습니다. `sim/xilinx_stubs.sv`가 이들의 **동작 모델**을 제공합니다:
+TOP은 7-시리즈 클럭 프리미티브 `BUFG`, `MMCME2_BASE`를 인스턴스화하는데, Verilator/iverilog에는
+Xilinx UNISIM 라이브러리가 없습니다. `sim/xilinx_stubs.sv`가 이들의 **동작 모델**을 제공합니다:
 
-- `IBUFG`/`BUFG`: 입력을 출력으로 통과(`assign O = I`).
-- `DCM_BASE`: `CLKIN`을 `CLK0`/`CLKFX`로 통과(사이클 기반 시뮬레이션에서는 4/5 주파수 비가 무의미 —
-  전 설계가 단일 테스트벤치 클럭으로 동작), `RST` 해제 몇 사이클 뒤 `LOCKED` 어서트.
+- `BUFG`: 입력을 출력으로 통과(`assign O = I`).
+- `MMCME2_BASE`: `CLKIN1`을 `CLKOUT0`/`CLKFBOUT`으로 통과(사이클 기반 시뮬레이션에서는 x8/10 비가
+  무의미 — 전 설계가 단일 테스트벤치 클럭으로 동작), `RST` 해제 몇 사이클 뒤 `LOCKED` 어서트.
 
-> **주의**: 이 stub은 **시뮬레이션 전용**입니다. ISE 합성 프로젝트에는 포함하지 마세요(거기서는 실제 UniSim 사용).
+> **주의**: 이 stub은 **시뮬레이션 전용**입니다. Vivado 프로젝트에는 포함하지 마세요(거기서는 실제 UNISIM 사용).
+> (원래 Virtex-5 `DCM_BASE`를 썼으나 Vivado 미지원으로 7-시리즈 `MMCME2_BASE`로 리타깃됨.)
 
 ### 2. `CLK_HZ` 파라미터화
 
@@ -131,28 +132,31 @@ LCD·로터리·미터의 지연이 `CLK_HZ`(실제 80 MHz)에서 파생되어, 
 
 ### 시뮬레이션 흐름
 
-1. 리셋 펄스 해제 → `dut.dcm_locked` 대기(stub이 곧 어서트).
+1. 리셋 펄스 해제 → `dut.mmcm_locked` 대기(stub이 곧 어서트).
 2. 로터리 스타트업 홀드(`CLK_HZ/5` ≈ 2.5M 사이클) 만료(`dut.u_rot.armed`) 대기.
 3. 로터리를 **시계방향으로 구동**(쿼드러처 `00→01→11→10→00` 시퀀스, 디글리치 FILTER보다 길게 유지)하여
    `speed_level`을 올림 → 자동 생성 간격 단축.
 4. 첫 이름 생성(`dut.gen_done`)을 포착해 ASCII로 디코드·출력.
-5. 이름 길이·DCM lock 검증 후 `TOP PASS`. 사이클 워치독으로 종료 보장(무한 정지 없음).
+5. 이름 길이·MMCM lock 검증 후 `TOP PASS`. 사이클 워치독으로 종료 보장(무한 정지 없음).
 
 ### 기대 출력
 
 ```
-[cycle 38] DCM locked
+[cycle 38] MMCM locked
 [cycle 2600032] rotary armed, raising speed...
 [cycle 2664031] speed_level=4
 generated name: sivont   (len=6)
-TOP PASS: board booted (DCM locked, LCD driving) and generated a name
+TOP PASS: board booted (MMCM locked, LCD driving) and generated a name
 ```
 
 - 생성되는 이름은 시드(=자유 실행 카운터 `seed_live` ^ `dip_sw`)가 발사 시점에 결정되므로 특정 골든이 아닌,
   **유효한 이름 하나가 생성됨**을 확인합니다. 약 2~3초, 수백만 사이클 내 완료됩니다.
 - 로터리 구동이 완벽하지 않아도, 자동 회전(1 Hz)의 자연 발사 + 워치독이 안전망 역할을 합니다.
 
-## iSim과의 관계
+## 합성 흐름과의 관계
 
-기존 iSim 흐름(README의 `fuse`/`isim_run.tcl`)은 그대로 유효합니다. Verilator는 오픈소스
-도구만으로 동일한 골든 검증을 수행하는 대안 경로입니다.
+RTL이 SystemVerilog로 이관되면서 원래의 ISE 14.7(iSim) 흐름은 폐기되었고, 합성은 **Vivado 24.2**로
+전환되었습니다. Vivado는 Virtex-5를 지원하지 않아 보드는 **Artix-7(xc7a100t, Nexys A7-100T)**로
+리타깃되었습니다 — `DCM_BASE` → `MMCME2_BASE`, `.ucf` → `board/nexys_a7_microgpt.xdc`, ISE tcl →
+`build_board_vivado_project.tcl`. Verilator는 그 합성 RTL을 오픈소스 도구만으로 골든 검증하는
+경로이며, `sim/xilinx_stubs.sv`가 Vivado 프리미티브를 대체합니다.

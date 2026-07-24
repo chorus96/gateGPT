@@ -213,15 +213,25 @@ python tools/export.py           # -> generated/*.hex, core/core_params.vh, gain
 python tools/ucode_asm.py        # -> generated/ucode.hex, core/coremap.vh
 ```
 
-Simulate the core against the golden (Xilinx iSim):
+Simulate against the Python golden with **Verilator** (open source):
 
 ```bash
-fuse -incremental -prj tb_core.prj -o sim/tb_core_sim work.tb_core
-./sim/tb_core_sim -tclbatch sim/isim_run.tcl     # prints CYCLES_PER_TOKEN + CORE PASS
+make -C sim            # build + run every testbench (all bit-exact PASS)
+make -C sim lint       # -Wall static lint (clean)
 ```
 
-Build the board bitstream (ISE 14.7): `xst → ngdbuild → map → par → trce → bitgen` against
-`xupv5_microgpt_top.prj` / `board/xupv5_microgpt.ucf` for part `xc5vlx110t-1-ff1136`.
+Build the board bitstream with **Vivado 24.2**. The RTL is now SystemVerilog and the
+original Virtex-5 target is not supported by Vivado, so the board flow is **retargeted to
+an Artix-7** (Digilent Nexys A7-100T, `xc7a100tcsg324-1`); the Virtex-5 `DCM_BASE` becomes an
+`MMCME2_BASE` (100 MHz → 80 MHz) and the ISE `.ucf` becomes `board/nexys_a7_microgpt.xdc`:
+
+```bash
+vivado -mode batch -source build_board_vivado_project.tcl            # synth + impl + bitstream
+vivado -mode batch -source build_board_vivado_project.tcl -tclargs noflow   # create project only
+```
+
+> The measurements and bring-up notes above are from the original Virtex-5 / ISE 14.7 build;
+> the numbers are historical. On Artix-7 the design closes 80 MHz comfortably.
 
 ## Board
 
