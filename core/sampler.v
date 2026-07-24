@@ -2,34 +2,35 @@
 // sample_mode=0 -> argmax (greedy). sample_mode=1 -> temperature softmax categorical:
 // scaled=logit/temp, softmax via max+exp+sum, draw r = LCG(rng) mod total, pick first
 // cumulative > r. Bit-exact with tools/fixedpoint.generate. Emits token + advanced LCG.
+// (SystemVerilog)
 module sampler #(
-    parameter integer VOCAB = 27,
-    parameter integer FRAC  = 11
+    parameter int VOCAB = 27,
+    parameter int FRAC  = 11
 ) (
-    input  wire        clk,
-    input  wire        resetn,
-    input  wire        start,
-    input  wire        sample_mode,
-    input  wire signed [15:0] inv_temp,    // (1/temperature) in Q11
-    input  wire [31:0] rng_in,
-    input  wire [9:0]  lm_base,
-    output wire [9:0]  v_raddr,
-    input  wire signed [15:0] v_rdata,
-    output reg  [4:0]  token,
-    output reg  [31:0] rng_out,
-    output reg         busy,
-    output reg         done
+    input  logic        clk,
+    input  logic        resetn,
+    input  logic        start,
+    input  logic        sample_mode,
+    input  logic signed [15:0] inv_temp,    // (1/temperature) in Q11
+    input  logic [31:0] rng_in,
+    input  logic [9:0]  lm_base,
+    output logic [9:0]  v_raddr,
+    input  logic signed [15:0] v_rdata,
+    output logic [4:0]  token,
+    output logic [31:0] rng_out,
+    output logic        busy,
+    output logic        done
 );
-    localparam [2:0] S_IDLE=0, S_SCALE=1, S_EXP=2, S_MOD=3, S_PICK=4;
-    reg [2:0]  st;
-    reg [4:0]  i, fi, fi_d, fi_d2, amax;
-    reg        feeding, vld, vld2;
-    reg signed [15:0] logit_r;    // logit registered before the variable temp multiply
-    reg signed [15:0] scaled [0:31];
-    reg [15:0]        ev [0:31];
-    reg signed [15:0] mmax;       // max of scaled logits (for softmax)
-    reg signed [15:0] maxlog;     // max of raw logits (for greedy argmax)
-    reg [31:0]        total, cum, rval, rngs;
+    typedef enum logic [2:0] { S_IDLE, S_SCALE, S_EXP, S_MOD, S_PICK } state_t;
+    state_t    st;
+    logic [4:0]  i, fi, fi_d, fi_d2, amax;
+    logic        feeding, vld, vld2;
+    logic signed [15:0] logit_r;    // logit registered before the variable temp multiply
+    logic signed [15:0] scaled [0:31];
+    logic [15:0]        ev [0:31];
+    logic signed [15:0] mmax;       // max of scaled logits (for softmax)
+    logic signed [15:0] maxlog;     // max of raw logits (for greedy argmax)
+    logic [31:0]        total, cum, rval, rngs;
 
     assign v_raddr = lm_base + {5'd0, fi};
 
@@ -49,21 +50,21 @@ module sampler #(
 
     // modulo via udiv: the divider already produces the remainder (rng mod total),
     // so no separate q*total multiply is needed.
-    reg         d_start;
+    logic       d_start;
     wire        d_done;
     wire [47:0] d_quo, d_rem;
     udiv #(.W(48)) u_div (.clk(clk), .resetn(resetn), .start(d_start),
         .num({16'd0, rngs}), .den({16'd0, total}), .busy(), .done(d_done),
         .quo(d_quo), .rem_out(d_rem));
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (!resetn) begin
             st <= S_IDLE; busy <= 0; done <= 0; d_start <= 0; feeding <= 0; vld <= 0;
         end else begin
             done <= 0; d_start <= 0;
             fi_d <= fi; vld <= feeding;
             fi_d2 <= fi_d; vld2 <= vld; logit_r <= v_rdata;     // scale-pass pipeline stage
-            case (st)
+            unique case (st)
                 S_IDLE: if (start) begin
                     busy <= 1; fi <= 0; mmax <= -16'sd32768; maxlog <= -16'sd32768; amax <= 0;
                     total <= 0; feeding <= 1; st <= S_SCALE;

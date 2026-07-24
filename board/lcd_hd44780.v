@@ -6,76 +6,77 @@
 //
 // All delays are derived from CLK_HZ (real-time), so they stay correct at any core
 // clock. Sim can pass a tiny CLK_HZ (or override the *_CYC params) to shrink them.
+// (SystemVerilog)
 module lcd_hd44780 #(
-    parameter integer CLK_HZ      = 50_000_000,
-    parameter integer POWERON_CYC = CLK_HZ/25,        // ~40 ms
-    parameter integer LONG_CYC    = CLK_HZ/244,       // ~4.1 ms (after first 0x3 / clear)
-    parameter integer SETTLE_CYC  = CLK_HZ/25000,     // ~40 us (normal command/data)
-    parameter integer E_CYC       = CLK_HZ/833333,    // ~1.2 us E high
-    parameter integer SU_CYC      = CLK_HZ/12500000   // ~80 ns RS/data setup before E (tAS)
+    parameter int CLK_HZ      = 50_000_000,
+    parameter int POWERON_CYC = CLK_HZ/25,        // ~40 ms
+    parameter int LONG_CYC    = CLK_HZ/244,       // ~4.1 ms (after first 0x3 / clear)
+    parameter int SETTLE_CYC  = CLK_HZ/25000,     // ~40 us (normal command/data)
+    parameter int E_CYC       = CLK_HZ/833333,    // ~1.2 us E high
+    parameter int SU_CYC      = CLK_HZ/12500000   // ~80 ns RS/data setup before E (tAS)
 ) (
-    input  wire        clk,
-    input  wire        resetn,
-    input  wire [(16*8)-1:0] line1,   // row 1 ASCII (byte 0 = leftmost column)
-    input  wire [(16*8)-1:0] line2,   // row 2 ASCII
+    input  logic        clk,
+    input  logic        resetn,
+    input  logic [(16*8)-1:0] line1,   // row 1 ASCII (byte 0 = leftmost column)
+    input  logic [(16*8)-1:0] line2,   // row 2 ASCII
 
-    output reg         lcd_rs,        // 0 = command, 1 = data
-    output wire        lcd_rw,        // tied 0 (write only)
-    output reg         lcd_e,         // enable strobe
-    output reg  [3:0]  lcd_db,        // DB[7:4]
-    output reg         ready          // high once init done
+    output logic        lcd_rs,        // 0 = command, 1 = data
+    output logic        lcd_rw,        // tied 0 (write only)
+    output logic        lcd_e,         // enable strobe
+    output logic [3:0]  lcd_db,        // DB[7:4]
+    output logic        ready          // high once init done
 );
     assign lcd_rw = 1'b0;
 
     // ---- init micro-sequence: 8 ops. is_nibble=1 -> high nibble only (8->4 bit). ----
-    localparam integer N_INIT = 8;
-    function [9:0] init_op;            // {is_nibble, rs, data[7:0]}
-        input [3:0] idx;
-        begin
-            case (idx)
-                4'd0: init_op = {1'b1, 1'b0, 8'h30};  // 0x3 wake (8-bit)
-                4'd1: init_op = {1'b1, 1'b0, 8'h30};
-                4'd2: init_op = {1'b1, 1'b0, 8'h30};
-                4'd3: init_op = {1'b1, 1'b0, 8'h20};  // 0x2 -> 4-bit mode
-                4'd4: init_op = {1'b0, 1'b0, 8'h28};  // function set: 4-bit, 2-line, 5x8
-                4'd5: init_op = {1'b0, 1'b0, 8'h0C};  // display on, cursor off
-                4'd6: init_op = {1'b0, 1'b0, 8'h01};  // clear (needs long wait)
-                default: init_op = {1'b0, 1'b0, 8'h06}; // entry mode: increment
-            endcase
-        end
+    localparam int N_INIT = 8;
+    function automatic logic [9:0] init_op(input logic [3:0] idx);   // {is_nibble, rs, data[7:0]}
+        unique case (idx)
+            4'd0: return {1'b1, 1'b0, 8'h30};  // 0x3 wake (8-bit)
+            4'd1: return {1'b1, 1'b0, 8'h30};
+            4'd2: return {1'b1, 1'b0, 8'h30};
+            4'd3: return {1'b1, 1'b0, 8'h20};  // 0x2 -> 4-bit mode
+            4'd4: return {1'b0, 1'b0, 8'h28};  // function set: 4-bit, 2-line, 5x8
+            4'd5: return {1'b0, 1'b0, 8'h0C};  // display on, cursor off
+            4'd6: return {1'b0, 1'b0, 8'h01};  // clear (needs long wait)
+            default: return {1'b0, 1'b0, 8'h06}; // entry mode: increment
+        endcase
     endfunction
 
-    localparam [2:0]
-        P_POWERON = 3'd0,
-        P_INIT    = 3'd1,
-        P_LATCH   = 3'd2,   // snapshot line1/line2 for a tear-free frame
-        P_ADDR1   = 3'd3,   // set DDRAM addr 0x80 (row 1)
-        P_CHARS1  = 3'd4,   // write 16 chars of row 1
-        P_ADDR2   = 3'd5,   // set DDRAM addr 0xC0 (row 2)
-        P_CHARS2  = 3'd6;   // write 16 chars of row 2
+    // main phase FSM
+    typedef enum logic [2:0] {
+        P_POWERON,   // power-up settle
+        P_INIT,      // 8-op init sequence
+        P_LATCH,     // snapshot line1/line2 for a tear-free frame
+        P_ADDR1,     // set DDRAM addr 0x80 (row 1)
+        P_CHARS1,    // write 16 chars of row 1
+        P_ADDR2,     // set DDRAM addr 0xC0 (row 2)
+        P_CHARS2     // write 16 chars of row 2
+    } phase_t;
 
     // byte-send sub-FSM (each nibble: RS/data setup -> E high -> settle)
-    localparam [2:0]
+    typedef enum logic [2:0] {
         B_IDLE  = 3'd0,
         B_HI_E  = 3'd1, B_HI_S = 3'd2,
         B_LO_E  = 3'd3, B_LO_S = 3'd4,
         B_DONE  = 3'd5,
-        B_HI_SU = 3'd6, B_LO_SU = 3'd7;
+        B_HI_SU = 3'd6, B_LO_SU = 3'd7
+    } bstate_t;
 
-    reg [2:0]  phase;
-    reg [2:0]  bs;
-    reg        bs_start, bs_busy, bs_nibble, bs_rs;
-    reg [7:0]  bs_data;
-    reg [31:0] bs_settle, cnt, poweron_cnt;
-    reg [4:0]  step;
-    reg [9:0]  op;
-    reg [(16*8)-1:0] l1_buf, l2_buf;   // latched frame
+    phase_t    phase;
+    bstate_t   bs;
+    logic        bs_start, bs_busy, bs_nibble, bs_rs;
+    logic [7:0]  bs_data;
+    logic [31:0] bs_settle, cnt, poweron_cnt;
+    logic [4:0]  step;
+    logic [9:0]  op;
+    logic [(16*8)-1:0] l1_buf, l2_buf;   // latched frame
 
     // current char: row-1 vs row-2 buffer, indexed by step
     wire [7:0] char1 = l1_buf[(step*8) +: 8];
     wire [7:0] char2 = l2_buf[(step*8) +: 8];
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (!resetn) begin
             phase <= P_POWERON; bs <= B_IDLE; bs_start <= 1'b0; bs_busy <= 1'b0;
             bs_nibble <= 1'b0; bs_rs <= 1'b0; bs_data <= 8'd0; bs_settle <= SETTLE_CYC;

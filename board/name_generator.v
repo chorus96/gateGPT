@@ -3,30 +3,30 @@
 // KV cache). Maintains the position counter, the current token, and the RNG state;
 // emits the name as packed bytes plus a per-token strobe. Tokens are 0='.', 1..26=
 // 'a'..'z'; name_buf stores (token-1) so a 0..25 -> 'a'..'z' display mapping works.
+// (SystemVerilog)
 module name_generator #(
-    parameter integer MAX_LEN = 16
+    parameter int MAX_LEN = 16
 ) (
-    input  wire        clk,
-    input  wire        resetn,
-    input  wire        start,
-    input  wire [31:0] seed,
-    input  wire signed [15:0] inv_temp,
-    input  wire        sample_mode,
-    output reg         busy,
-    output reg         done,
-    output reg  [7:0]  token_out,
-    output reg         token_valid,
-    output reg  [4:0]  name_len,
-    output wire [(MAX_LEN*8)-1:0] name_flat
+    input  logic        clk,
+    input  logic        resetn,
+    input  logic        start,
+    input  logic [31:0] seed,
+    input  logic signed [15:0] inv_temp,
+    input  logic        sample_mode,
+    output logic        busy,
+    output logic        done,
+    output logic [7:0]  token_out,
+    output logic        token_valid,
+    output logic [4:0]  name_len,
+    output logic [(MAX_LEN*8)-1:0] name_flat
 );
-    localparam [1:0] G_IDLE=0, G_FIRE=1, G_WAIT=2, G_DONE=3;
-    reg [1:0]  state;
-    reg [4:0]  pos, cur_token;       // current absolute position + token fed to the core
-    reg [31:0] rng;
-    reg [7:0]  name_buf [0:MAX_LEN-1];
-    integer    k;
+    typedef enum logic [1:0] { G_IDLE, G_FIRE, G_WAIT, G_DONE } state_t;
+    state_t    state;
+    logic [4:0]  pos, cur_token;       // current absolute position + token fed to the core
+    logic [31:0] rng;
+    logic [7:0]  name_buf [0:MAX_LEN-1];
 
-    reg         core_start;
+    logic       core_start;
     wire        core_busy, core_done;
     wire [4:0]  core_tok;
     wire [31:0] core_rng;
@@ -36,24 +36,23 @@ module name_generator #(
         .sample_mode(sample_mode), .inv_temp(inv_temp), .rng_in(rng),
         .busy(core_busy), .done(core_done), .next_token(core_tok), .rng_out(core_rng));
 
-    genvar g;
-    generate for (g = 0; g < MAX_LEN; g = g + 1) begin : GEN_FLAT
+    generate for (genvar g = 0; g < MAX_LEN; g++) begin : GEN_FLAT
         assign name_flat[(g*8) +: 8] = name_buf[g];
     end endgenerate
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (!resetn) begin
             state <= G_IDLE; busy <= 0; done <= 0; token_valid <= 0; name_len <= 0;
             pos <= 0; cur_token <= 0; rng <= 32'd1; core_start <= 0; token_out <= 0;
-            for (k = 0; k < MAX_LEN; k = k + 1) name_buf[k] <= 8'd0;
+            for (int k = 0; k < MAX_LEN; k++) name_buf[k] <= 8'd0;
         end else begin
             done <= 0; token_valid <= 0; core_start <= 0;
-            case (state)
+            unique case (state)
                 G_IDLE: begin
                     busy <= 0;
                     if (start) begin
                         busy <= 1; pos <= 0; cur_token <= 0; rng <= seed; name_len <= 0;
-                        for (k = 0; k < MAX_LEN; k = k + 1) name_buf[k] <= 8'd0;
+                        for (int k = 0; k < MAX_LEN; k++) name_buf[k] <= 8'd0;
                         state <= G_FIRE;
                     end
                 end

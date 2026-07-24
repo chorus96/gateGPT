@@ -4,30 +4,31 @@
 // RMSNorm sum-of-squares, attention score/weighted-sum), two writes (RMSNorm scale,
 // matvec writeback), or the legacy one-read + one-write. Callers must not write the same
 // address on both ports in one cycle. 1024x16 fits one RAMB18 in true-dual-port mode.
+// (SystemVerilog)
 module vmem2 #(
-    parameter integer AW = 10,
-    parameter integer DW = 16
+    parameter int AW = 10,
+    parameter int DW = 16
 ) (
-    input  wire                 clk,
+    input  logic                 clk,
     // port A
-    input  wire                 we_a,
-    input  wire [AW-1:0]        addr_a,
-    input  wire signed [DW-1:0] wdata_a,
-    output reg  signed [DW-1:0] rdata_a,
+    input  logic                 we_a,
+    input  logic [AW-1:0]        addr_a,
+    input  logic signed [DW-1:0] wdata_a,
+    output logic signed [DW-1:0] rdata_a,
     // port B
-    input  wire                 we_b,
-    input  wire [AW-1:0]        addr_b,
-    input  wire signed [DW-1:0] wdata_b,
-    output reg  signed [DW-1:0] rdata_b
+    input  logic                 we_b,
+    input  logic [AW-1:0]        addr_b,
+    input  logic signed [DW-1:0] wdata_b,
+    output logic signed [DW-1:0] rdata_b
 );
     // XST true-dual-port BRAM template: one always block PER PORT on the shared array.
     // (Both ports in a single block makes XST fall back to flip-flops, not block RAM.)
-    (* ram_style = "block" *) reg signed [DW-1:0] mem [0:(1<<AW)-1];
-    always @(posedge clk) begin                 // port A
+    (* ram_style = "block" *) logic signed [DW-1:0] mem [0:(1<<AW)-1];
+    always_ff @(posedge clk) begin                 // port A
         if (we_a) mem[addr_a] <= wdata_a;
         rdata_a <= mem[addr_a];
     end
-    always @(posedge clk) begin                 // port B
+    always_ff @(posedge clk) begin                 // port B
         if (we_b) mem[addr_b] <= wdata_b;
         rdata_b <= mem[addr_b];
     end

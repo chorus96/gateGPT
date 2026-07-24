@@ -9,26 +9,27 @@
 // PC-side over the USB JTAG cable: an optional ChipScope VIO core (CHIPSCOPE_VIO).
 //
 // Core runs at 80 MHz (DCM CLKFX x4/5). Post-PAR closes at 80.24 MHz, 0 timing errors.
+// (SystemVerilog)
 module xupv5_microgpt_top (
-    input  wire        clk_100,      // 100 MHz board oscillator
-    input  wire        rst_btn,      // reset push button (active high)
-    input  wire        start_btn,    // "generate one" push button (active high)
-    input  wire [7:0]  dip_sw,       // 8 DIP switches (seed bits)
-    input  wire        rot_a,        // rotary INCA
-    input  wire        rot_b,        // rotary INCB
-    input  wire        rot_push,     // rotary push (freeze while held)
-    output wire [7:0]  led,          // status LEDs (speed level + flags)
+    input  logic        clk_100,      // 100 MHz board oscillator
+    input  logic        rst_btn,      // reset push button (active high)
+    input  logic        start_btn,    // "generate one" push button (active high)
+    input  logic [7:0]  dip_sw,       // 8 DIP switches (seed bits)
+    input  logic        rot_a,        // rotary INCA
+    input  logic        rot_b,        // rotary INCB
+    input  logic        rot_push,     // rotary push (freeze while held)
+    output logic [7:0]  led,          // status LEDs (speed level + flags)
     // 16x2 character LCD (HD44780, 4-bit)
-    output wire        lcd_rs,
-    output wire        lcd_rw,
-    output wire        lcd_e,
-    output wire [3:0]  lcd_db        // DB[7:4]
+    output logic        lcd_rs,
+    output logic        lcd_rw,
+    output logic        lcd_e,
+    output logic [3:0]  lcd_db        // DB[7:4]
 );
     // CLK_HZ is a parameter (default = the real 80 MHz core clock) so a simulation top
     // can override it to a smaller value and shrink the CLK_HZ-derived real-time delays
     // (LCD power-on/settle, rotary start-up hold, auto-rotation interval, tok/s window).
     // Synthesis keeps the default, so board behaviour is unchanged.
-    parameter integer CLK_HZ = 80_000_000;   // core runs at DCM CLKFX (100*4/5) = 80 MHz
+    parameter int CLK_HZ = 80_000_000;   // core runs at DCM CLKFX (100*4/5) = 80 MHz
 
     // ---------------- clocking: 100 MHz osc -> DCM CLKFX (x4/5) -> 80 MHz core -----
     // After the block-RAM + pipeline rework the core is ~89 MHz post-synth; it closes
@@ -53,11 +54,11 @@ module xupv5_microgpt_top (
     // rst_btn bounces on press/release; require the level stable for RST_FILTER
     // (~2 ms) before it changes the synchronous reset. DCM keeps the raw button on
     // its RST (it must reset at power-up and self-clears on lock).
-    localparam integer RST_FILTER = 100000;        // ~2 ms @ 50 MHz
-    reg [1:0]  rb_sync   = 2'd0;
-    reg        rb_clean  = 1'b1;                    // start held in reset until lock
-    reg [17:0] rb_cnt    = 18'd0;
-    always @(posedge clk) begin
+    localparam int RST_FILTER = 100000;        // ~2 ms @ 50 MHz
+    logic [1:0]  rb_sync   = 2'd0;
+    logic        rb_clean  = 1'b1;                    // start held in reset until lock
+    logic [17:0] rb_cnt    = 18'd0;
+    always_ff @(posedge clk) begin
         rb_sync <= {rb_sync[0], rst_btn};
         if (rb_sync[1] == rb_clean)        rb_cnt <= 18'd0;
         else if (rb_cnt >= RST_FILTER)     begin rb_clean <= rb_sync[1]; rb_cnt <= 18'd0; end
@@ -69,11 +70,11 @@ module xupv5_microgpt_top (
     // The cursor-button line glitches and was firing ~66 spurious presses/sec (a
     // ~330 t/s floor at rest). Require the level stable for BTN_FILTER (~2 ms) before
     // a press registers; a real press lasts far longer, glitches are rejected.
-    localparam integer BTN_FILTER = 100000;        // ~2 ms @ 50 MHz
-    reg [1:0]  sb_sync = 2'd0;
-    reg        sb_clean = 1'b0, sb_clean_d = 1'b0;
-    reg [17:0] sb_cnt = 18'd0;
-    always @(posedge clk) begin
+    localparam int BTN_FILTER = 100000;        // ~2 ms @ 50 MHz
+    logic [1:0]  sb_sync = 2'd0;
+    logic        sb_clean = 1'b0, sb_clean_d = 1'b0;
+    logic [17:0] sb_cnt = 18'd0;
+    always_ff @(posedge clk) begin
         sb_sync <= {sb_sync[0], start_btn};
         if (sb_sync[1] == sb_clean)            sb_cnt <= 18'd0;
         else if (sb_cnt >= BTN_FILTER)         begin sb_clean <= sb_sync[1]; sb_cnt <= 18'd0; end
@@ -83,8 +84,8 @@ module xupv5_microgpt_top (
     wire btn_pulse = sb_clean & ~sb_clean_d;       // rising edge of the debounced press
 
     // ---------------- seed source: free-running counter ---------------------------
-    reg [31:0] seed_live = 32'd1;
-    always @(posedge clk) seed_live <= seed_live + 32'd1;
+    logic [31:0] seed_live = 32'd1;
+    always_ff @(posedge clk) seed_live <= seed_live + 32'd1;
 
     // ---------------- VIO controls (default standalone) ---------------------------
     wire        vio_start, vio_use_host;
@@ -113,17 +114,16 @@ module xupv5_microgpt_top (
     // temperature presets: temp_sel 0..7 -> T = 0.5..1.2 (step 0.1); inv_temp = round(2048/T)
     // in Q5.11. The sampler already has a 16x16 multiply, so any value is free; 0.1 steps
     // keep the on-LCD readout to a single decimal digit.
-    function signed [15:0] temp_lut;
-        input [2:0] sel;
-        case (sel)
-            3'd0: temp_lut = 16'sd4096;   // T=0.5
-            3'd1: temp_lut = 16'sd3413;   // T=0.6
-            3'd2: temp_lut = 16'sd2926;   // T=0.7  (default)
-            3'd3: temp_lut = 16'sd2560;   // T=0.8
-            3'd4: temp_lut = 16'sd2276;   // T=0.9
-            3'd5: temp_lut = 16'sd2048;   // T=1.0
-            3'd6: temp_lut = 16'sd1862;   // T=1.1
-            default: temp_lut = 16'sd1707;// T=1.2
+    function automatic logic signed [15:0] temp_lut(input logic [2:0] sel);
+        unique case (sel)
+            3'd0: return 16'sd4096;   // T=0.5
+            3'd1: return 16'sd3413;   // T=0.6
+            3'd2: return 16'sd2926;   // T=0.7  (default)
+            3'd3: return 16'sd2560;   // T=0.8
+            3'd4: return 16'sd2276;   // T=0.9
+            3'd5: return 16'sd2048;   // T=1.0
+            3'd6: return 16'sd1862;   // T=1.1
+            default: return 16'sd1707;// T=1.2
         endcase
     endfunction
 
@@ -147,9 +147,9 @@ module xupv5_microgpt_top (
     );
 
     // latch the last completed name so the LCD shows a stable string between names
-    reg [(16*8)-1:0] name_show;
-    reg [4:0]        name_len_show;
-    always @(posedge clk) begin
+    logic [(16*8)-1:0] name_show;
+    logic [4:0]        name_len_show;
+    always_ff @(posedge clk) begin
         if (!resetn) begin name_show <= {16{8'd0}}; name_len_show <= 5'd0; end
         else if (gen_done) begin name_show <= name_flat; name_len_show <= name_len; end
     end
@@ -162,24 +162,22 @@ module xupv5_microgpt_top (
     );
 
     // ---------------- LCD line 1: welcome banner, then the generated name ---------
-    reg show_welcome;
-    always @(posedge clk) begin
+    logic show_welcome;
+    always_ff @(posedge clk) begin
         if (!resetn)      show_welcome <= 1'b1;
         else if (gen_done) show_welcome <= 1'b0;
     end
 
-    function [7:0] tok_ascii;     // token 0..25 -> 'a'..'z', else space
-        input [7:0] t;
-        tok_ascii = (t < 8'd26) ? (8'd97 + t) : 8'h20;
+    function automatic logic [7:0] tok_ascii(input logic [7:0] t);   // token 0..25 -> 'a'..'z', else space
+        return (t < 8'd26) ? (8'd97 + t) : 8'h20;
     endfunction
 
     // welcome banner as a flat constant, col0 in the LSB byte (reversed literal)
     wire [(16*8)-1:0] welcome_str = "   omed TPGorcim";   // = "microGPT demo   "
 
     wire [(16*8)-1:0] line1;
-    genvar gi;
     generate
-        for (gi = 0; gi < 16; gi = gi + 1) begin : GEN_LINE1
+        for (genvar gi = 0; gi < 16; gi++) begin : GEN_LINE1
             assign line1[(gi*8) +: 8] =
                 show_welcome ? welcome_str[(gi*8) +: 8] :
                 (gi < name_len_show) ? tok_ascii(name_show[(gi*8) +: 8]) : 8'h20;
@@ -234,9 +232,9 @@ module xupv5_microgpt_top (
     //          right and any fast generation is a throttle-interval problem, not clock.
     // led[6] = gen_busy (at 1 Hz it blinks briefly; if solid-on, generation is back-to-back).
     // led[4:0] = speed_level.
-    reg [25:0] hb_cnt = 26'd0;
-    reg        hb     = 1'b0;
-    always @(posedge clk) begin
+    logic [25:0] hb_cnt = 26'd0;
+    logic        hb     = 1'b0;
+    always_ff @(posedge clk) begin
         if (hb_cnt >= 26'd39_999_999) begin hb_cnt <= 26'd0; hb <= ~hb; end   // 0.5 s @ 80 MHz
         else                                hb_cnt <= hb_cnt + 26'd1;
     end
@@ -247,8 +245,8 @@ module xupv5_microgpt_top (
     wire [35:0]  vio_control;
     wire [49:0]  vio_sync_out;
     wire [138:0] vio_sync_in;
-    reg  [1:0] vstart_sync = 2'd0;
-    always @(posedge clk) vstart_sync <= {vstart_sync[0], vio_sync_out[0]};
+    logic [1:0] vstart_sync = 2'd0;
+    always_ff @(posedge clk) vstart_sync <= {vstart_sync[0], vio_sync_out[0]};
     assign vio_start    = (vstart_sync == 2'b01);
     assign vio_use_host = vio_sync_out[1];
     assign vio_seed     = vio_sync_out[33:2];

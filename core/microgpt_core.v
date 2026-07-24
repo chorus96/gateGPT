@@ -5,19 +5,20 @@
 // new token at position pos_in (token_in), writing its K/V into the cache slot KC[pos]/
 // VC[pos] (use_pos), and attends over positions 0..pos_in. The KC/VC cache lives in
 // vmem and survives across calls. Bit-exact with tools/fixedpoint.QModel.logits_last.
+// (SystemVerilog)
 module microgpt_core (
-    input  wire        clk,
-    input  wire        resetn,
-    input  wire        start,
-    input  wire [4:0]  token_in,             // new token at this position
-    input  wire [4:0]  pos_in,               // absolute position (0..BLOCK-1)
-    input  wire        sample_mode,
-    input  wire signed [15:0] inv_temp,      // (1/temperature) in Q5.11
-    input  wire [31:0] rng_in,
-    output reg         busy,
-    output reg         done,
-    output reg  [4:0]  next_token,
-    output reg  [31:0] rng_out
+    input  logic        clk,
+    input  logic        resetn,
+    input  logic        start,
+    input  logic [4:0]  token_in,             // new token at this position
+    input  logic [4:0]  pos_in,               // absolute position (0..BLOCK-1)
+    input  logic        sample_mode,
+    input  logic signed [15:0] inv_temp,      // (1/temperature) in Q5.11
+    input  logic [31:0] rng_in,
+    output logic        busy,
+    output logic        done,
+    output logic [4:0]  next_token,
+    output logic [31:0] rng_out
 );
 `include "core_params.vh"
 `include "coremap.vh"
@@ -27,7 +28,7 @@ module microgpt_core (
     // ties small $readmemh ROM arrays to zero, which left the program all-NOP on the board
     // (the sequencer never reached HALT -> the core hung). See core/ucode_rom.vh.
 `include "ucode_rom.vh"
-    reg [7:0]  pc;
+    logic [7:0]  pc;
     wire [71:0] instr   = ucode_rom(pc);
     wire [3:0]  op      = instr[3:0];
     wire [3:0]  wsel    = instr[7:4];
@@ -41,7 +42,7 @@ module microgpt_core (
     wire        use_pos = instr[66];
 
     // latched per-token inputs
-    reg [4:0] tok_r, pos_r;
+    logic [4:0] tok_r, pos_r;
     wire [9:0] pos_off = pos_r * N_EMBED;                    // cache slot offset
     wire [9:0] mv_dst  = use_pos ? (d_base + pos_off) : d_base;
 
@@ -56,7 +57,7 @@ module microgpt_core (
         .we_b(pb_we), .addr_b(pb_addr), .wdata_b(pb_wd), .rdata_b(v_rdata_b));
 
     // ---------------- actuators ----------------
-    reg  em_go, no_go, mv_go, at_go, vo_go, sp_go;
+    logic em_go, no_go, mv_go, at_go, vo_go, sp_go;
     wire em_we; wire [9:0] em_wa; wire signed [15:0] em_wd; wire em_busy, em_done;
     embed #(.N_EMBED(N_EMBED)) u_embed (.clk(clk), .resetn(resetn), .start(em_go),
         .token(tok_r), .pos(pos_r[3:0]), .dst_base(d_base),
@@ -130,16 +131,16 @@ module microgpt_core (
         (op == OP_SAMPLE) ? sp_done : 1'b1;
 
     // ---------------- sequencer ----------------
-    localparam [1:0] Q_IDLE=0, Q_EXEC=1, Q_WAIT=2;
-    reg [1:0] q;
-    always @(posedge clk) begin
+    typedef enum logic [1:0] { Q_IDLE, Q_EXEC, Q_WAIT } qstate_t;
+    qstate_t q;
+    always_ff @(posedge clk) begin
         if (!resetn) begin
             q <= Q_IDLE; pc <= 0; busy <= 0; done <= 0;
             em_go<=0; no_go<=0; mv_go<=0; at_go<=0; vo_go<=0; sp_go<=0;
         end else begin
             done <= 0;
             em_go<=0; no_go<=0; mv_go<=0; at_go<=0; vo_go<=0; sp_go<=0;
-            case (q)
+            unique case (q)
                 Q_IDLE: if (start) begin
                     busy <= 1; pc <= 0; tok_r <= token_in; pos_r <= pos_in; q <= Q_EXEC;
                 end

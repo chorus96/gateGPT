@@ -3,12 +3,13 @@
 // initialize a $readmemh ROM for arrays this small (it ties them to 0), which zeroed
 // the gains in hardware and produced garbage. Constants synthesize correctly.
 // Dual read (addr_a/addr_b) so the 2-elements/cycle scale pass can fetch both gains.
+// (SystemVerilog)
 module grom (
-    input  wire [1:0]         sel,
-    input  wire [5:0]         addr_a,
-    input  wire [5:0]         addr_b,
-    output wire signed [15:0] gdata_a,
-    output wire signed [15:0] gdata_b
+    input  logic [1:0]         sel,
+    input  logic [5:0]         addr_a,
+    input  logic [5:0]         addr_b,
+    output logic signed [15:0] gdata_a,
+    output logic signed [15:0] gdata_b
 );
 `include "gains.vh"
     assign gdata_a = gain_lut(sel, addr_a[4:0]);

@@ -5,26 +5,27 @@
 //   cfg_mode = 1 (TEMP) : level 0..NTEMP-1 selects the sampling temperature (the top
 //                         maps temp_sel -> inv_temp via a small LUT).
 // A debounced PRESS toggles cfg_mode; the LED/LCD in the top shows which is active.
+// (SystemVerilog)
 module rotary_throttle #(
-    parameter integer CLK_HZ    = 50_000_000,  // core clock
-    parameter integer MAX_LEVEL = 15,          // 1 rev (15 detents) spans the rate range
-    parameter integer NTEMP     = 8,           // number of temperature presets
-    parameter integer FILTER    = 2500         // ~50 us deglitch (cycles a level must hold)
+    parameter int CLK_HZ    = 50_000_000,  // core clock
+    parameter int MAX_LEVEL = 15,          // 1 rev (15 detents) spans the rate range
+    parameter int NTEMP     = 8,           // number of temperature presets
+    parameter int FILTER    = 2500         // ~50 us deglitch (cycles a level must hold)
 ) (
-    input  wire        clk,
-    input  wire        resetn,
-    input  wire        rot_a,        // INCA (async, active high)
-    input  wire        rot_b,        // INCB (async)
-    input  wire        rot_push,     // PUSH (async, active high) -> toggles cfg_mode
-    input  wire        gen_busy,     // name generator busy
-    output reg         auto_start,   // 1-cycle pulse: launch a generation
-    output reg  [4:0]  speed_level,  // RATE setting
-    output reg  [2:0]  temp_sel,     // TEMP preset index (0..NTEMP-1)
-    output reg         cfg_mode      // 0 = adjusting rate, 1 = adjusting temperature
+    input  logic        clk,
+    input  logic        resetn,
+    input  logic        rot_a,        // INCA (async, active high)
+    input  logic        rot_b,        // INCB (async)
+    input  logic        rot_push,     // PUSH (async, active high) -> toggles cfg_mode
+    input  logic        gen_busy,     // name generator busy
+    output logic        auto_start,   // 1-cycle pulse: launch a generation
+    output logic [4:0]  speed_level,  // RATE setting
+    output logic [2:0]  temp_sel,     // TEMP preset index (0..NTEMP-1)
+    output logic        cfg_mode      // 0 = adjusting rate, 1 = adjusting temperature
 );
     // ---- synchronize the async encoder inputs (2 FF) ----
-    reg [1:0] a_ff, b_ff, p_ff;
-    always @(posedge clk) begin
+    logic [1:0] a_ff, b_ff, p_ff;
+    always_ff @(posedge clk) begin
         a_ff <= {a_ff[0], rot_a};
         b_ff <= {b_ff[0], rot_b};
         p_ff <= {p_ff[0], rot_push};
@@ -33,9 +34,9 @@ module rotary_throttle #(
     wire b_sync = b_ff[1];
 
     // ---- deglitch the two phase lines: accept a level only after FILTER stable cycles ----
-    reg a_clean, b_clean;
-    reg [11:0] a_cnt, b_cnt;
-    always @(posedge clk) begin
+    logic a_clean, b_clean;
+    logic [11:0] a_cnt, b_cnt;
+    always_ff @(posedge clk) begin
         if (!resetn) begin
             a_clean <= 1'b0; b_clean <= 1'b0; a_cnt <= 12'd0; b_cnt <= 12'd0;
         end else begin
@@ -50,10 +51,10 @@ module rotary_throttle #(
     end
 
     // ---- push button: debounce (~2 ms) + rising edge -> toggle cfg_mode ----
-    localparam integer PUSH_FILTER = CLK_HZ / 500;     // ~2 ms
-    reg        push_clean, push_clean_d;
-    reg [19:0] push_cnt;
-    always @(posedge clk) begin
+    localparam int PUSH_FILTER = CLK_HZ / 500;     // ~2 ms
+    logic        push_clean, push_clean_d;
+    logic [19:0] push_cnt;
+    always_ff @(posedge clk) begin
         if (!resetn) begin
             push_clean <= 1'b0; push_clean_d <= 1'b0; push_cnt <= 20'd0; cfg_mode <= 1'b0;
         end else begin
@@ -66,11 +67,11 @@ module rotary_throttle #(
     end
 
     // ---- quadrature decode: accumulate signed edges, one step per detent ----
-    localparam integer EDGES_PER_DETENT = 4;
-    localparam integer STARTUP_HOLD     = CLK_HZ / 5;   // ~200 ms power-up/DCM-lock holdoff
+    localparam int EDGES_PER_DETENT = 4;
+    localparam int STARTUP_HOLD     = CLK_HZ / 5;   // ~200 ms power-up/DCM-lock holdoff
 
-    reg [1:0] ab, ab_d;
-    always @(posedge clk) begin
+    logic [1:0] ab, ab_d;
+    always_ff @(posedge clk) begin
         ab   <= {a_clean, b_clean};
         ab_d <= ab;
     end
@@ -78,13 +79,13 @@ module rotary_throttle #(
     wire up_edge = (tr == 4'b0001) || (tr == 4'b0111) || (tr == 4'b1110) || (tr == 4'b1000);
     wire dn_edge = (tr == 4'b0010) || (tr == 4'b1011) || (tr == 4'b1101) || (tr == 4'b0100);
 
-    reg signed [3:0] acc;
-    reg [31:0]       startup;
+    logic signed [3:0] acc;
+    logic [31:0]       startup;
     wire armed = (startup == 32'd0);
     wire detent_up = armed && up_edge && !dn_edge && (acc >=  (EDGES_PER_DETENT - 1));
     wire detent_dn = armed && dn_edge && !up_edge && (acc <= -(EDGES_PER_DETENT - 1));
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (!resetn) begin
             speed_level <= 5'd0;
             temp_sel    <= 3'd2;                 // default preset (T=0.7 in the top's LUT)
@@ -113,10 +114,10 @@ module rotary_throttle #(
     end
 
     // ---- auto-start interval = CLK_HZ >> speed_level (level 0 = 1 Hz) ----
-    localparam [31:0] CLK_HZ_W = CLK_HZ;
+    localparam logic [31:0] CLK_HZ_W = CLK_HZ;
     wire [31:0] interval = CLK_HZ_W >> speed_level;
-    reg  [31:0] timer;
-    always @(posedge clk) begin
+    logic [31:0] timer;
+    always_ff @(posedge clk) begin
         if (!resetn) begin
             timer      <= 32'd0;
             auto_start <= 1'b0;

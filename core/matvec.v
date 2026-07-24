@@ -6,53 +6,53 @@
 // drains TWO rows/cycle on the two write ports -> LANES/2 cycles. tiles = ceil(out_dim/LANES).
 // Reads are registered (1-cycle): addresses are driven combinationally a cycle ahead and the
 // weight bus is registered (w_rdata_r) to align -- giving the multipliers an MREG stage too.
+// (SystemVerilog)
 module matvec #(
-    parameter integer LANES = 24,
-    parameter integer ACCW  = 48
+    parameter int LANES = 24,
+    parameter int ACCW  = 48
 ) (
-    input  wire        clk,
-    input  wire        resetn,
-    input  wire        start,
-    input  wire [2:0]  wsel,
-    input  wire [6:0]  in_dim,
-    input  wire [6:0]  out_dim,
-    input  wire [9:0]  act_base,
-    input  wire [9:0]  dst_base,
-    input  wire [4:0]  descale,
+    input  logic        clk,
+    input  logic        resetn,
+    input  logic        start,
+    input  logic [2:0]  wsel,
+    input  logic [6:0]  in_dim,
+    input  logic [6:0]  out_dim,
+    input  logic [9:0]  act_base,
+    input  logic [9:0]  dst_base,
+    input  logic [4:0]  descale,
     // port A (reads act[2j]; writes even rows)
-    output reg  [9:0]  addr_a,
-    input  wire signed [15:0] rd_a,
-    output reg         we_a,
-    output reg  signed [15:0] wd_a,
+    output logic [9:0]  addr_a,
+    input  logic signed [15:0] rd_a,
+    output logic        we_a,
+    output logic signed [15:0] wd_a,
     // port B (reads act[2j+1]; writes odd rows)
-    output reg  [9:0]  addr_b,
-    input  wire signed [15:0] rd_b,
-    output reg         we_b,
-    output reg  signed [15:0] wd_b,
-    output wire [11:0] w_addr,                  // tile-word address: tile*(in_dim/2) + j
-    input  wire [2*LANES*16-1:0] w_rdata,       // LANES weights for col 2j (low) + col 2j+1 (high)
-    output reg         busy,
-    output reg         done
+    output logic [9:0]  addr_b,
+    input  logic signed [15:0] rd_b,
+    output logic        we_b,
+    output logic signed [15:0] wd_b,
+    output logic [11:0] w_addr,                  // tile-word address: tile*(in_dim/2) + j
+    input  logic [2*LANES*16-1:0] w_rdata,       // LANES weights for col 2j (low) + col 2j+1 (high)
+    output logic        busy,
+    output logic        done
 );
-    localparam [1:0] S_IDLE=2'd0, S_RUN=2'd1, S_DRAIN=2'd2, S_WB=2'd3;
-    localparam integer HW = LANES*16;           // half-word boundary (col 2j+1 offset)
+    typedef enum logic [1:0] { S_IDLE, S_RUN, S_DRAIN, S_WB } state_t;
+    localparam int HW = LANES*16;               // half-word boundary (col 2j+1 offset)
     // sized copy of LANES for arithmetic: a bit-select of the integer parameter (LANES[6:0])
     // synthesizes wrong in XST 14.7 (it zeroed obase -> multi-tile matmuls hung on the board).
-    localparam [6:0] LANES_W = LANES;
-    reg [1:0]  st;
-    reg [6:0]  fi;                    // column-pair (feed) index within the current tile
-    (* keep = "true" *) reg [6:0]  obase;   // first output row of the current tile = tile*LANES
-    (* keep = "true" *) reg [11:0] wbase;   // first word of the current tile = tile*(in_dim/2)
-    reg [6:0]  wbi;                   // writeback row index within the tile (advances by 2)
-    reg        feeding, vld, vld2;
-    reg [1:0]  dcnt;                  // drain counter (flush the 2-stage operand pipeline)
+    localparam logic [6:0] LANES_W = LANES;
+    state_t    st;
+    logic [6:0]  fi;                    // column-pair (feed) index within the current tile
+    (* keep = "true" *) logic [6:0]  obase;   // first output row of the current tile = tile*LANES
+    (* keep = "true" *) logic [11:0] wbase;   // first word of the current tile = tile*(in_dim/2)
+    logic [6:0]  wbi;                   // writeback row index within the tile (advances by 2)
+    logic        feeding, vld, vld2;
+    logic [1:0]  dcnt;                  // drain counter (flush the 2-stage operand pipeline)
     // operand pipeline: register BOTH activation and weight one extra stage before the
     // multiply, so the long BRAM-output -> DSP net is off the critical path (the multiply
     // starts from nearby fabric registers / DSP input registers instead).
-    reg [2*LANES*16-1:0] w_rdata_r, w_rdata_rr;
-    reg signed [15:0] rd_a_r, rd_b_r;
-    reg signed [ACCW-1:0] acc [0:LANES-1];
-    integer L;
+    logic [2*LANES*16-1:0] w_rdata_r, w_rdata_rr;
+    logic signed [15:0] rd_a_r, rd_b_r;
+    logic signed [ACCW-1:0] acc [0:LANES-1];
 
     assign w_addr = wbase + {5'd0, fi};
 
@@ -65,23 +65,23 @@ module matvec #(
         (sh_b > 48'sd32767) ? 16'sd32767 : (sh_b < -48'sd32768) ? -16'sd32768 : sh_b[15:0];
 
     // combinational port drivers: read the activation pair during compute, write a row pair in S_WB
-    always @(*) begin
+    always_comb begin
         addr_a = act_base + {2'd0, fi, 1'b0};       // act[2j]
         addr_b = act_base + {2'd0, fi, 1'b0} + 10'd1; // act[2j+1]
         we_a = 1'b0; we_b = 1'b0; wd_a = sat_a; wd_b = sat_b;
         if (st == S_WB) begin
             addr_a = dst_base + {3'd0, obase + wbi};
             addr_b = dst_base + {3'd0, obase + wbi} + 10'd1;
-            we_a = (obase + wbi      < out_dim);
+            we_a = (obase + wbi        < out_dim);
             we_b = (obase + wbi + 7'd1 < out_dim);
         end
     end
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (!resetn) begin
             st <= S_IDLE; busy <= 0; done <= 0;
             fi <= 0; obase <= 0; wbase <= 0; wbi <= 0; feeding <= 0; vld <= 0; vld2 <= 0; dcnt <= 0;
-            for (L = 0; L < LANES; L = L + 1) acc[L] <= 0;
+            for (int L = 0; L < LANES; L++) acc[L] <= '0;
         end else begin
             done <= 0;
             // operand pipeline (2 stages): weight comb-ROM -> w_rdata_r -> w_rdata_rr,
@@ -89,15 +89,15 @@ module matvec #(
             w_rdata_r <= w_rdata; w_rdata_rr <= w_rdata_r;
             rd_a_r <= rd_a; rd_b_r <= rd_b;
             vld <= feeding; vld2 <= vld;
-            case (st)
+            unique case (st)
                 S_IDLE: if (start) begin
                     busy <= 1; fi <= 0; obase <= 0; wbase <= 0;
-                    for (L = 0; L < LANES; L = L + 1) acc[L] <= 0;
+                    for (int L = 0; L < LANES; L++) acc[L] <= '0;
                     feeding <= 1; st <= S_RUN;
                 end
                 S_RUN: begin
                     if (vld2)
-                        for (L = 0; L < LANES; L = L + 1)
+                        for (int L = 0; L < LANES; L++)
                             acc[L] <= acc[L]
                                 + $signed(rd_a_r) * $signed(w_rdata_rr[L*16 +: 16])
                                 + $signed(rd_b_r) * $signed(w_rdata_rr[HW + L*16 +: 16]);
@@ -106,7 +106,7 @@ module matvec #(
                 end
                 S_DRAIN: begin
                     if (vld2)                                  // flush the last column pairs
-                        for (L = 0; L < LANES; L = L + 1)
+                        for (int L = 0; L < LANES; L++)
                             acc[L] <= acc[L]
                                 + $signed(rd_a_r) * $signed(w_rdata_rr[L*16 +: 16])
                                 + $signed(rd_b_r) * $signed(w_rdata_rr[HW + L*16 +: 16]);
@@ -120,7 +120,7 @@ module matvec #(
                         end else begin                         // next tile
                             obase <= obase + LANES_W; wbase <= wbase + {5'd0, (in_dim >> 1)};
                             fi <= 0;
-                            for (L = 0; L < LANES; L = L + 1) acc[L] <= 0;
+                            for (int L = 0; L < LANES; L++) acc[L] <= '0;
                             feeding <= 1; st <= S_RUN;
                         end
                     end else wbi <= wbi + 7'd2;

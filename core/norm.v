@@ -3,43 +3,45 @@
 // reference (tools/fixedpoint.rmsnorm). Uses the TRUE dual-port vmem: the sum-of-squares
 // pass reads TWO elements per cycle (ports A+B) and the scale pass writes TWO per cycle,
 // so both N-length loops run in N/2 cycles (N must be even). Read addresses are driven
-// combinationally (registered read inside vmem -> 1-cycle latency, read-ahead).
+// combinationally (registered read inside vmem -> 1-cycle latency, read-ahead). (SystemVerilog)
 module norm #(
-    parameter integer N    = 24,
-    parameter integer FRAC = 11
+    parameter int N    = 24,
+    parameter int FRAC = 11
 ) (
-    input  wire        clk,
-    input  wire        resetn,
-    input  wire        start,
-    input  wire [9:0]  src_base,
-    input  wire [9:0]  dst_base,
-    input  wire [1:0]  gain_sel,
+    input  logic        clk,
+    input  logic        resetn,
+    input  logic        start,
+    input  logic [9:0]  src_base,
+    input  logic [9:0]  dst_base,
+    input  logic [1:0]  gain_sel,
     // port A
-    output reg  [9:0]  addr_a,
-    input  wire signed [15:0] rd_a,
-    output reg         we_a,
-    output reg  signed [15:0] wd_a,
+    output logic [9:0]  addr_a,
+    input  logic signed [15:0] rd_a,
+    output logic        we_a,
+    output logic signed [15:0] wd_a,
     // port B
-    output reg  [9:0]  addr_b,
-    input  wire signed [15:0] rd_b,
-    output reg         we_b,
-    output reg  signed [15:0] wd_b,
+    output logic [9:0]  addr_b,
+    input  logic signed [15:0] rd_b,
+    output logic        we_b,
+    output logic signed [15:0] wd_b,
     // gains (two per cycle)
-    output wire [5:0]  g_addr_a,
-    output wire [5:0]  g_addr_b,
-    input  wire signed [15:0] g_rdata_a,
-    input  wire signed [15:0] g_rdata_b,
-    output reg         busy,
-    output reg         done
+    output logic [5:0]  g_addr_a,
+    output logic [5:0]  g_addr_b,
+    input  logic signed [15:0] g_rdata_a,
+    input  logic signed [15:0] g_rdata_b,
+    output logic        busy,
+    output logic        done
 );
-    localparam [2:0] S_IDLE=0, S_SUM=1, S_SUMD=2, S_DIV1=3, S_SQRT=4, S_DIV2=5, S_SCALE=6;
-    reg [2:0]  st;
-    reg [6:0]  fi, fi_d;                  // element index (advances by 2), delayed copy
-    reg        feeding, vld;
-    reg signed [47:0] ss;
-    reg [31:0] scale_q;
-    reg signed [15:0] xreg [0:N-1];
-    reg signed [15:0] t1a_r, t1b_r, ga_r, gb_r;   // scale-pass pipeline registers
+    typedef enum logic [2:0] {
+        S_IDLE, S_SUM, S_SUMD, S_DIV1, S_SQRT, S_DIV2, S_SCALE
+    } state_t;
+    state_t    st;
+    logic [6:0]  fi, fi_d;                  // element index (advances by 2), delayed copy
+    logic        feeding, vld;
+    logic signed [47:0] ss;
+    logic [31:0] scale_q;
+    logic signed [15:0] xreg [0:N-1];
+    logic signed [15:0] t1a_r, t1b_r, ga_r, gb_r;   // scale-pass pipeline registers
 
     assign g_addr_a = fi[5:0];
     assign g_addr_b = fi[5:0] + 6'd1;
@@ -48,13 +50,13 @@ module norm #(
     wire signed [47:0] xsq_b = $signed(rd_b) * $signed(rd_b);
 
     // shared udiv / isqrt
-    reg  [47:0] d_num, d_den;
-    wire        d_done;  wire [47:0] d_quo;
-    reg         d_start;
+    logic [47:0] d_num, d_den;
+    wire         d_done;  wire [47:0] d_quo;
+    logic        d_start;
     udiv #(.W(48)) u_div (.clk(clk), .resetn(resetn), .start(d_start),
         .num(d_num), .den(d_den), .busy(), .done(d_done), .quo(d_quo));
-    reg         s_start;
-    wire        s_done;  wire [15:0] s_root;       // mean-square <= 2^30 -> 32-bit radicand
+    logic        s_start;
+    wire         s_done;  wire [15:0] s_root;       // mean-square <= 2^30 -> 32-bit radicand
     isqrt #(.W(32)) u_sqrt (.clk(clk), .resetn(resetn), .start(s_start),
         .radicand(d_num[31:0]), .busy(), .done(s_done), .root(s_root));
 
@@ -79,7 +81,7 @@ module norm #(
 
     // combinational port drivers (read pair during SUM, write pair during SCALE)
     wire scale_wr = (st == S_SCALE) && vld;
-    always @(*) begin
+    always_comb begin
         addr_a = src_base + {3'd0, fi};
         addr_b = src_base + {3'd0, fi} + 10'd1;
         we_a = 1'b0; we_b = 1'b0; wd_a = ya; wd_b = yb;
@@ -90,14 +92,14 @@ module norm #(
         end
     end
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (!resetn) begin
             st <= S_IDLE; busy <= 0; done <= 0;
             d_start <= 0; s_start <= 0; feeding <= 0; vld <= 0;
         end else begin
             done <= 0; d_start <= 0; s_start <= 0;
             fi_d <= fi; vld <= feeding;
-            case (st)
+            unique case (st)
                 S_IDLE: if (start) begin
                     busy <= 1; fi <= 0; ss <= 0; feeding <= 1; st <= S_SUM;
                 end

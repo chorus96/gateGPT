@@ -1,35 +1,35 @@
 // Unsigned integer square root: root = floor(sqrt(radicand)), W-bit radicand ->
 // W/2-bit root. Classic bit-pair (non-restoring) algorithm, W/2 cycles. Matches
-// Python math.isqrt. Used by RMSNorm. Synthesizable.
+// Python math.isqrt. Used by RMSNorm. Synthesizable. (SystemVerilog)
 module isqrt #(
-    parameter integer W = 48        // radicand width (even)
+    parameter int W = 48           // radicand width (even)
 ) (
-    input  wire         clk,
-    input  wire         resetn,
-    input  wire         start,
-    input  wire [W-1:0] radicand,
-    output reg          busy,
-    output reg          done,
-    output reg  [W/2-1:0] root
+    input  logic           clk,
+    input  logic           resetn,
+    input  logic           start,
+    input  logic [W-1:0]   radicand,
+    output logic           busy,
+    output logic           done,
+    output logic [W/2-1:0] root
 );
-    reg [W-1:0]  op;          // remaining radicand
-    reg [W-1:0]  res;         // result accumulator
-    reg [W-1:0]  bitm;        // current power-of-four
-    reg          st;
-    reg [7:0]    cnt;
+    logic [W-1:0] op;          // remaining radicand
+    logic [W-1:0] res;         // result accumulator
+    logic [W-1:0] bitm;        // current power-of-four
+    logic         st;
+    logic [7:0]   cnt;
 
     wire [W-1:0] resbit = res + bitm;
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (!resetn) begin
             busy <= 1'b0; done <= 1'b0; st <= 1'b0;
         end else begin
             done <= 1'b0;
             if (!st) begin
                 if (start) begin
-                    op <= radicand; res <= {W{1'b0}};
+                    op   <= radicand; res <= '0;
                     bitm <= {2'b01, {(W-2){1'b0}}};   // 1 << (W-2): top even bit
-                    cnt <= (W/2) - 1; busy <= 1'b1; st <= 1'b1;
+                    cnt  <= (W/2) - 1; busy <= 1'b1; st <= 1'b1;
                 end
             end else begin
                 if (op >= resbit) begin

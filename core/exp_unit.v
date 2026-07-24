@@ -5,11 +5,11 @@
 // PIPELINED (latency 1): the table lookup + decode is registered, the interpolation
 // multiply runs the next cycle -> shorter combinational path (this chain was the
 // post-pipeline Fmax limiter). Callers feed z and read e one cycle later (it replaces
-// the dz_r register they used to keep before a combinational exp_unit).
+// the dz_r register they used to keep before a combinational exp_unit). (SystemVerilog)
 module exp_unit (
-    input  wire               clk,
-    input  wire signed [15:0] z,
-    output wire signed [15:0] e
+    input  logic               clk,
+    input  logic signed [15:0] z,
+    output logic signed [15:0] e
 );
     // exp table as a combinational case function (NOT $readmemh: XST 14.7 zeroes small
     // $readmemh distributed ROMs). 17 entries: exp_tab_rom[k] = round(exp(-k)*2048).
@@ -24,10 +24,10 @@ module exp_unit (
     wire signed [15:0] hi = (ui >= 5'd16) ? 16'sd0 : exp_tab_rom(ui[4:0] + 5'd1);
 
     // pipeline register (cut between the ROM lookup and the interpolation multiply)
-    reg signed [15:0] lo_r, hi_r;
-    reg [10:0]        uf_r;
-    reg               pos_r, big_r;
-    always @(posedge clk) begin
+    logic signed [15:0] lo_r, hi_r;
+    logic [10:0]        uf_r;
+    logic               pos_r, big_r;
+    always_ff @(posedge clk) begin
         lo_r <= lo; hi_r <= hi; uf_r <= uf;
         pos_r <= (z >= 0); big_r <= (ui >= 5'd16);
     end
