@@ -1,7 +1,8 @@
 // Unit test for exp_unit vs the Python reference (sweep of z values).
 `timescale 1ns/1ps
 module tb_exp;
-    localparam M = 102;       // upper bound on cases; extra entries stay x and are skipped
+    localparam M = 103;       // exact number of exp cases in the golden hex (skip logic below
+                              // still tolerates fewer via the x-sentinel; keep M == file lines)
     reg signed [15:0] zs [0:M-1], es [0:M-1];
     reg clk = 0;
     always #5 clk = ~clk;
@@ -12,8 +13,8 @@ module tb_exp;
     integer k, errors, n;
     initial begin
         for (k = 0; k < M; k = k + 1) begin zs[k] = 16'shxxxx; es[k] = 16'shxxxx; end
-        $readmemh("/home/hermes/microgpt_fpga/generated/test_exp_z.hex", zs);
-        $readmemh("/home/hermes/microgpt_fpga/generated/test_exp_e.hex", es);
+        $readmemh("generated/test_exp_z.hex", zs);
+        $readmemh("generated/test_exp_e.hex", es);
         errors = 0; n = 0;
         for (k = 0; k < M; k = k + 1) begin
             if (zs[k] !== 16'shxxxx) begin

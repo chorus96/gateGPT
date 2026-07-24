@@ -19,14 +19,14 @@ module microgpt_core (
     output reg  [4:0]  next_token,
     output reg  [31:0] rng_out
 );
-`include "/home/hermes/microgpt_fpga/core/core_params.vh"
-`include "/home/hermes/microgpt_fpga/core/coremap.vh"
+`include "core_params.vh"
+`include "coremap.vh"
 
     // ---------------- program ROM (combinational case) + fetch/decode ----------------
     // The microcode is a combinational function, NOT a $readmemh distributed ROM: XST 14.7
     // ties small $readmemh ROM arrays to zero, which left the program all-NOP on the board
     // (the sequencer never reached HALT -> the core hung). See core/ucode_rom.vh.
-`include "/home/hermes/microgpt_fpga/core/ucode_rom.vh"
+`include "ucode_rom.vh"
     reg [7:0]  pc;
     wire [71:0] instr   = ucode_rom(pc);
     wire [3:0]  op      = instr[3:0];

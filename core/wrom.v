@@ -12,6 +12,6 @@ module wrom #(
     input  wire [11:0]           addr,   // tile-word address: tile*(in_dim/2) + j
     output wire [2*LANES*16-1:0] wdata
 );
-`include "/home/hermes/microgpt_fpga/core/wrom_data.vh"
+`include "wrom_data.vh"
     assign wdata = wrom_data(sel, addr);
 endmodule

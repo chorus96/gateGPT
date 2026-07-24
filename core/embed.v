@@ -17,8 +17,8 @@ module embed #(
 );
     // Embedding ROMs as combinational case functions (NOT $readmemh: XST 14.7 zeroes
     // small $readmemh distributed ROMs). tok = 27x24, pos = 16x24, row-major.
-`include "/home/hermes/microgpt_fpga/core/tok_emb.vh"
-`include "/home/hermes/microgpt_fpga/core/pos_emb.vh"
+`include "tok_emb.vh"
+`include "pos_emb.vh"
 
     reg [6:0]  i;
     reg [9:0]  tbase, pbase;

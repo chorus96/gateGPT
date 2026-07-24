@@ -10,7 +10,7 @@ module grom (
     output wire signed [15:0] gdata_a,
     output wire signed [15:0] gdata_b
 );
-`include "/home/hermes/microgpt_fpga/core/gains.vh"
+`include "gains.vh"
     assign gdata_a = gain_lut(sel, addr_a[4:0]);
     assign gdata_b = gain_lut(sel, addr_b[4:0]);
 endmodule

@@ -39,8 +39,8 @@ module tb_norm;
 
     integer k, errors;
     initial begin
-        $readmemh("/home/hermes/microgpt_fpga/generated/test_norm_in.hex", tin);
-        $readmemh("/home/hermes/microgpt_fpga/generated/test_norm_out.hex", texp);
+        $readmemh("generated/test_norm_in.hex", tin);
+        $readmemh("generated/test_norm_out.hex", texp);
         errors = 0; load = 1; tb_we = 0; resetn = 0;
         repeat (4) @(posedge clk); resetn = 1;
         for (k = 0; k < N; k = k + 1) begin

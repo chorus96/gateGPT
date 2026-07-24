@@ -39,10 +39,10 @@ module tb_attn;
     endtask
 
     initial begin
-        $readmemh("/home/hermes/microgpt_fpga/generated/test_attn_q.hex", tq);
-        $readmemh("/home/hermes/microgpt_fpga/generated/test_attn_k.hex", tk);
-        $readmemh("/home/hermes/microgpt_fpga/generated/test_attn_v.hex", tv);
-        $readmemh("/home/hermes/microgpt_fpga/generated/test_attn_out.hex", texp);
+        $readmemh("generated/test_attn_q.hex", tq);
+        $readmemh("generated/test_attn_k.hex", tk);
+        $readmemh("generated/test_attn_v.hex", tv);
+        $readmemh("generated/test_attn_out.hex", texp);
         errors = 0; load = 1; tb_we = 0; resetn = 0;
         repeat (4) @(posedge clk); resetn = 1;
         wload(QB, N, 0); wload(KB, KV, 1); wload(VB, KV, 2);

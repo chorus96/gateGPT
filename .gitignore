@@ -61,3 +61,7 @@ __pycache__/
 netlist.lst
 fuseRelaunch.cmd
 *.lst
+
+# Verilator build artifacts
+sim/obj/
+obj_dir/

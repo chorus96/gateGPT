@@ -13,7 +13,7 @@ module exp_unit (
 );
     // exp table as a combinational case function (NOT $readmemh: XST 14.7 zeroes small
     // $readmemh distributed ROMs). 17 entries: exp_tab_rom[k] = round(exp(-k)*2048).
-`include "/home/hermes/microgpt_fpga/core/exp_data.vh"
+`include "exp_data.vh"
 
     // stage 1 (combinational): |z|, table lookup, decode
     wire signed [17:0] zx = {{2{z[15]}}, z};

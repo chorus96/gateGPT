@@ -46,8 +46,8 @@ module tb_matvec;
 
     integer k, errors;
     initial begin
-        $readmemh("/home/hermes/microgpt_fpga/generated/test_in.hex", tin);
-        $readmemh("/home/hermes/microgpt_fpga/generated/test_wq.hex", texp);
+        $readmemh("generated/test_in.hex", tin);
+        $readmemh("generated/test_wq.hex", texp);
         errors = 0;
         load = 1; tb_we = 0; resetn = 0;
         repeat (4) @(posedge clk);
