@@ -1,0 +1,3 @@
+### tb_norm  2026-07-24 10:47:28
+NORM PASS: all 24 outputs match
+- /home/user/gateGPT/sim/tb_norm.v:62: Verilog $finish

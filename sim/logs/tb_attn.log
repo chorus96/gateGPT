@@ -1,0 +1,3 @@
+### tb_attn  2026-07-24 10:47:28
+ATTN PASS: all 24 outputs match
+- /home/user/gateGPT/sim/tb_attn.v:62: Verilog $finish

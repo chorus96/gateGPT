@@ -1,0 +1,7 @@
+### tb_core  2026-07-24 10:47:28
+CYCLES_PER_TOKEN = 1157
+greedy tokens: 1 12 1 25 1
+AVG_CYCLES = 1322 over 12 tokens (last=1489)
+sampled tokens: 18 15 19 16 8 15 4
+CORE PASS: greedy + sampled match golden
+- /home/user/gateGPT/sim/tb_core.v:84: Verilog $finish

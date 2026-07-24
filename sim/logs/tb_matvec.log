@@ -1,0 +1,3 @@
+### tb_matvec  2026-07-24 10:47:28
+MATVEC PASS: all 24 outputs match
+- /home/user/gateGPT/sim/tb_matvec.v:77: Verilog $finish

@@ -1,0 +1,7 @@
+### tb_top  2026-07-24 10:47:28
+[cycle 38] DCM locked
+[cycle 2600032] rotary armed, raising speed...
+[cycle 2664031] speed_level=4
+generated name: sivont   (len=6)
+TOP PASS: board booted (DCM locked, LCD driving) and generated a name
+- /home/user/gateGPT/sim/tb_top.v:103: Verilog $finish
