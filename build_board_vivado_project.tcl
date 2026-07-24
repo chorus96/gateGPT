@@ -17,11 +17,11 @@
 #      (a helper is sketched at the bottom of this file). This project-mode script
 #      builds the PL logic standalone (synth checks out; clk_100 is a create_clock net).
 #   2. Peripherals: Kria SOMs have no onboard switches/LEDs/LCD/rotary. All 28 of
-#      this design's signals are pre-assigned in board/kr260_microgpt.xdc to the
-#      KR260 Raspberry Pi 40-pin GPIO header IN PHYSICAL-PIN ORDER (annotated with
-#      each RPi pin # and BCM GPIO name). Only the PACKAGE_PIN balls are left as the
-#      <BALL> placeholder -- replace each with the xck26-sfvc784 ball the AMD KR260
-#      master XDC gives for that RPi pin, then uncomment, before implementation.
+#      this design's signals are pinned in board/kr260_microgpt.xdc to KR260 SOM240
+#      user-PL I/O (SOM240_1 bank 45 + SOM240_2 bank 43, LVCMOS18) using real
+#      xck26-sfvc784 balls from the KR260 I/O map -- each line is annotated with its
+#      SOM240 pin, bank, and native IO_ name. Wire your switches/LEDs/LCD/rotary to
+#      those SOM240 pins (they surface on the carrier Pmod / RPi 40-pin header).
 #
 #  Replaces the ISE flow (build_board_ise_project.tcl / run_board_bitgen.tcl / *.ucf).
 # ============================================================================
@@ -54,7 +54,8 @@ add_files -fileset constrs_1 -norecurse $root/board/kr260_microgpt.xdc
 puts "=== gategpt Vivado project created at $prj (part=$part, top=$top) ==="
 
 # --- run synthesis + implementation + bitstream (skip with -tclargs noflow) ---
-# NOTE: implementation needs real PACKAGE_PIN LOCs in the XDC (see KRIA NOTES).
+# NOTE: the XDC already carries real PACKAGE_PIN LOCs; for a full bitstream clk_100
+# still needs to be driven by the PS pl_clk0 via a block design (see KRIA NOTES).
 if {[lsearch -exact $argv "noflow"] >= 0} {
     puts "=== noflow: project created, skipping synth/impl ==="
 } else {

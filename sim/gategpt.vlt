@@ -1,5 +1,5 @@
 `verilator_config
-// Lint waiver file for gateGPT (Verilator only; not part of the ISE project).
+// Lint waiver file for gateGPT (Verilator only; not part of the Vivado project).
 //
 // Every rule below is waived on purpose: the warnings are intentional design
 // choices, not defects. The RTL is bit-exact against the Python reference
