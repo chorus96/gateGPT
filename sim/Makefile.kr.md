@@ -62,9 +62,9 @@ make -C sim clean      # 빌드 산출물(obj/, logs/) 삭제
 | `WAIVER` | `sim/gategpt.vlt` — Verilator lint waiver 파일(검토된 의도적 경고 억제) |
 | `VFLAGS` | `--binary --timing -Wall $(WAIVER) -I$(ROOT)/core` (빌드) |
 | `LINTFLAGS` | `--lint-only --timing -Wall $(WAIVER) -I$(ROOT)/core` (lint) |
-| `CORE` | `core/*.v` 전체 (`$(wildcard ...)`) |
-| `BOARD` | `board/*.v` 전체 |
-| `STUBS` | `sim/xilinx_stubs.v` (Xilinx 프리미티브 stub) |
+| `CORE` | `core/*.sv` 전체 (`$(wildcard ...)`) |
+| `BOARD` | `board/*.sv` 전체 |
+| `STUBS` | `sim/xilinx_stubs.sv` (Xilinx 프리미티브 stub) |
 | `OBJDIR` | `sim/obj` (빌드 산출물 디렉터리, gitignore 대상) |
 | `LOGDIR` | `sim/logs` (테스트벤치별 실행 로그 디렉터리, gitignore 대상) |
 | `STAMP` | `$(shell date ...)` — make 시작 시 1회 평가되는 타임스탬프(로그 헤더용) |
@@ -105,7 +105,7 @@ RTL을 전혀 건드리지 않고 lint를 완전히 깨끗하게 유지하기 �
 lint:
 	@set -e; \
 	for spec in "xupv5_microgpt_top:$(BOARD) $(CORE) $(STUBS)" \
-	            $(foreach t,$(TESTS),"$(t):$(ROOT)/sim/$(t).v $(SRCS_$(t))"); do \
+	            $(foreach t,$(TESTS),"$(t):$(ROOT)/sim/$(t).sv $(SRCS_$(t))"); do \
 	  top=$${spec%%:*}; srcs=$${spec#*:}; \
 	  $(VERILATOR) $(LINTFLAGS) --top-module $$top $$srcs && echo clean; \
 	done
@@ -121,7 +121,7 @@ $(foreach t,$(UNIT),$(eval SRCS_$(t) := $(CORE)))   # 유닛 → 코어만
 SRCS_$(TOP) := $(CORE) $(BOARD) $(STUBS)            # TOP → 코어+보드+stub
 ```
 
-- 유닛 테스트는 `core/*.v`만 필요. 인스턴스화되지 않는 모듈은 Verilator가 자동 가지치기(prune).
+- 유닛 테스트는 `core/*.sv`만 필요. 인스턴스화되지 않는 모듈은 Verilator가 자동 가지치기(prune).
 - `tb_top`은 보드 모듈과 Xilinx stub까지 필요(클럭 프리미티브 모델).
 
 ## 규칙 자동 생성 (`define` + `foreach`/`eval`)
@@ -136,10 +136,10 @@ $(1): $(OBJDIR)/$(1)/$(1)_sim
 	    2>&1 | tee $(LOGDIR)/$(1).log                # 실행 + 터미널·로그 동시 출력(tee)
 	@echo "  -> log saved to sim/logs/$(1).log"
 
-$(OBJDIR)/$(1)/$(1)_sim: $(ROOT)/sim/$(1).v $(SRCS_$(1))
+$(OBJDIR)/$(1)/$(1)_sim: $(ROOT)/sim/$(1).sv $(SRCS_$(1))
 	@mkdir -p $(OBJDIR)/$(1)                         # 중첩 디렉터리 미리 생성
 	$(VERILATOR) $(VFLAGS) --top-module $(1) --Mdir $(OBJDIR)/$(1) -o $(1)_sim \
-	    $(ROOT)/sim/$(1).v $(SRCS_$(1))              # 빌드 규칙
+	    $(ROOT)/sim/$(1).sv $(SRCS_$(1))              # 빌드 규칙
 endef
 
 $(foreach t,$(TESTS),$(eval $(call RUN_TB,$(t))))    # 모든 타깃에 적용
@@ -167,7 +167,7 @@ $(foreach t,$(TESTS),$(eval $(call RUN_TB,$(t))))    # 모든 타깃에 적용
 
 ## 관련 파일과의 관계
 
-- **테스트벤치**: `sim/tb_*.v` (7개) — 각각 자체 top 모듈.
-- **stub**: `sim/xilinx_stubs.v` — `tb_top`의 Xilinx 프리미티브 모델.
+- **테스트벤치**: `sim/tb_*.sv` (7개) — 각각 자체 top 모듈.
+- **stub**: `sim/xilinx_stubs.sv` — `tb_top`의 Xilinx 프리미티브 모델.
 - **골든 데이터**: `generated/*.hex`(유닛), `core/*.vh`(코어 ROM) — 런타임/컴파일 타임에 로드.
 - **문서**: `sim/verilator.kr.md` — 전체 시뮬레이션 흐름과 이식성 변경 사항 안내.

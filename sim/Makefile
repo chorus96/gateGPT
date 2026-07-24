@@ -25,21 +25,21 @@ VERILATOR ?= verilator
 WAIVER    := $(ROOT)/sim/gategpt.vlt
 VFLAGS    := --binary --timing -Wall $(WAIVER) -I$(ROOT)/core
 LINTFLAGS := --lint-only --timing -Wall $(WAIVER) -I$(ROOT)/core
-CORE      := $(wildcard $(ROOT)/core/*.v)
-BOARD     := $(wildcard $(ROOT)/board/*.v)
-STUBS     := $(ROOT)/sim/xilinx_stubs.v
+CORE      := $(wildcard $(ROOT)/core/*.sv)
+BOARD     := $(wildcard $(ROOT)/board/*.sv)
+STUBS     := $(ROOT)/sim/xilinx_stubs.sv
 OBJDIR    := $(ROOT)/sim/obj
 # per-testbench run logs land in LOGDIR (keep the value free of trailing spaces)
 LOGDIR    := $(ROOT)/sim/logs
 STAMP     := $(shell date '+%Y-%m-%d %H:%M:%S')
 
-# Unit / core testbenches (need only core/*.v).
+# Unit / core testbenches (need only core/*.sv).
 UNIT  := tb_mathops tb_exp tb_matvec tb_norm tb_attn tb_core
 # Board-level top testbench (needs core + board + Xilinx primitive stubs).
 TOP   := tb_top
 TESTS := $(UNIT) $(TOP)
 
-# Extra Verilog sources (besides sim/<tb>.v) each testbench elaborates.
+# Extra sources (besides sim/<tb>.sv) each testbench elaborates.
 $(foreach t,$(UNIT),$(eval SRCS_$(t) := $(CORE)))
 SRCS_$(TOP) := $(CORE) $(BOARD) $(STUBS)
 
@@ -53,7 +53,7 @@ all: $(TESTS)
 lint:
 	@set -e; \
 	for spec in "xupv5_microgpt_top:$(BOARD) $(CORE) $(STUBS)" \
-	            $(foreach t,$(TESTS),"$(t):$(ROOT)/sim/$(t).v $(SRCS_$(t))"); do \
+	            $(foreach t,$(TESTS),"$(t):$(ROOT)/sim/$(t).sv $(SRCS_$(t))"); do \
 	  top=$${spec%%:*}; srcs=$${spec#*:}; \
 	  printf '== lint %-22s ' "$$top"; \
 	  $(VERILATOR) $(LINTFLAGS) --top-module $$top $$srcs && echo "clean"; \
@@ -68,10 +68,10 @@ $(1): $(OBJDIR)/$(1)/$(1)_sim
 	@cd $(ROOT) && { echo "### $(1)  $(STAMP)"; $(OBJDIR)/$(1)/$(1)_sim; } 2>&1 | tee $(LOGDIR)/$(1).log
 	@echo "  -> log saved to sim/logs/$(1).log"
 
-$(OBJDIR)/$(1)/$(1)_sim: $(ROOT)/sim/$(1).v $(SRCS_$(1)) $(WAIVER)
+$(OBJDIR)/$(1)/$(1)_sim: $(ROOT)/sim/$(1).sv $(SRCS_$(1)) $(WAIVER)
 	@mkdir -p $(OBJDIR)/$(1)
 	$(VERILATOR) $(VFLAGS) --top-module $(1) --Mdir $(OBJDIR)/$(1) -o $(1)_sim \
-	    $(ROOT)/sim/$(1).v $(SRCS_$(1))
+	    $(ROOT)/sim/$(1).sv $(SRCS_$(1))
 endef
 
 $(foreach t,$(TESTS),$(eval $(call RUN_TB,$(t))))

@@ -108,10 +108,10 @@ Verilator 공식 waiver 파일 `sim/gategpt.vlt`로 처리합니다.
 이름 생성기(코어) → HD44780 LCD → 초당 토큰 미터)를 통합합니다. 이를 Verilator로 돌리기 위해
 두 가지 장애물을 해결했습니다.
 
-### 1. Xilinx 프리미티브 stub (`sim/xilinx_stubs.v`)
+### 1. Xilinx 프리미티브 stub (`sim/xilinx_stubs.sv`)
 
 TOP은 Virtex-5 클럭 프리미티브 `IBUFG`, `BUFG`, `DCM_BASE`를 인스턴스화하는데, Verilator/iverilog에는
-Xilinx UniSim 라이브러리가 없습니다. `sim/xilinx_stubs.v`가 이들의 **동작 모델**을 제공합니다:
+Xilinx UniSim 라이브러리가 없습니다. `sim/xilinx_stubs.sv`가 이들의 **동작 모델**을 제공합니다:
 
 - `IBUFG`/`BUFG`: 입력을 출력으로 통과(`assign O = I`).
 - `DCM_BASE`: `CLKIN`을 `CLK0`/`CLKFX`로 통과(사이클 기반 시뮬레이션에서는 4/5 주파수 비가 무의미 —

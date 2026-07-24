@@ -3,7 +3,7 @@
 //
 // Every rule below is waived on purpose: the warnings are intentional design
 // choices, not defects. The RTL is bit-exact against the Python reference
-// (verified by sim/tb_*.v) and synthesizes on ISE 14.7. This file changes NO
+// (verified by sim/tb_*.sv). This file changes NO
 // behaviour -- it only silences reviewed, benign lint categories so that
 // `verilator --lint-only -Wall` reports clean.
 
@@ -36,11 +36,11 @@ lint_off -rule VARHIDDEN
 // set 1ns/1ps.
 lint_off -rule TIMESCALEMOD
 
-// Simulation-only stub file (xilinx_stubs.v) holds several vendor-cell models,
+// Simulation-only stub file (xilinx_stubs.sv) holds several vendor-cell models,
 // so module names do not match the filename.
 lint_off -rule DECLFILENAME
 
 // LCD setup/settle waits are parameterized on CLK_HZ; at a small (simulation)
 // CLK_HZ a threshold like SU_CYC-1 becomes 0, so `cnt >= 0` is constant-true.
 // That is the intended "minimum wait" behaviour, not a bug.
-lint_off -rule UNSIGNED -file "*lcd_hd44780.v"
+lint_off -rule UNSIGNED -file "*lcd_hd44780.sv"

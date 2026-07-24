@@ -5,8 +5,9 @@
 
 > **참고 (SystemVerilog 이관):** `core/`·`board/`의 RTL은 이후 **SystemVerilog**로 변환되었습니다
 > — 자료형 `logic`, `always_ff`/`always_comb`, `typedef enum` FSM, `automatic` 함수 등 현대 SV 관용구를
-> 사용합니다(동작·타이밍·비트 일치는 그대로 보존, Verilator로 검증). 파일 확장자는 `.v`를 유지하되 내용은
-> SV입니다. 이 문서의 아래 문법 설명은 원래의 **Verilog-2001** 기반을 정리한 것으로, 개념적 배경으로 유효합니다.
+> 사용합니다(동작·타이밍·비트 일치는 그대로 보존, Verilator로 검증). RTL/시뮬레이션 소스 파일은 이후
+> **`.sv` 확장자**로 리네임되었습니다(`core/*.sv`, `board/*.sv`, `sim/*.sv`). 이 문서의 아래 문법 설명은
+> 원래의 **Verilog-2001** 기반을 정리한 것으로, 개념적 배경으로 유효합니다.
 > 생성된 `core/*.vh`(마이크로코드/가중치 ROM)는 여전히 Verilog(함수/`localparam`)이며 SV 모듈에서 그대로 포함됩니다.
 > **주의:** SV 이관으로 XST 14.7 합성 흐름은 더 이상 지원되지 않습니다(SV 지원 부족); 시뮬레이션은 Verilator를 사용하세요.
 
