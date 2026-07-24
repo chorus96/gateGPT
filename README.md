@@ -233,9 +233,12 @@ vivado -mode batch -source build_board_vivado_project.tcl -tclargs noflow   # cr
 
 > **Kria specifics:** the K26 has no free PL oscillator, so `clk_100` is sourced from the PS
 > fabric clock `pl_clk0` (100 MHz) via a block design; and the SOM has no onboard
-> switches/LEDs/LCD/rotary, so those I/O map to the carrier's PMOD/expansion (fill the
-> `<FILL_ME>` LOCs in the XDC). The measurements and bring-up notes above are from the
-> original Virtex-5 / ISE 14.7 build and are historical.
+> switches/LEDs/LCD/rotary, so all 28 peripheral signals are pinned in the XDC to the KR260
+> SOM240 user-PL I/O (SOM240_1 bank 45 + SOM240_2 bank 43, `LVCMOS18`) with real
+> `xck26-sfvc784` balls taken from the KR260 I/O map — wire your switches/LEDs/LCD/rotary to
+> those SOM240 pins (they surface on the carrier's Pmod / Raspberry Pi 40-pin header). The
+> measurements and bring-up notes above are from the original Virtex-5 / ISE 14.7 build and
+> are historical.
 
 ## Board
 

@@ -61,4 +61,6 @@ flowchart TB
 보드 최상위로, 코어(`name_generator`→`microgpt_core`)와 주변장치(로터리/LCD/미터/MMCM)를 통합.
 Vivado 빌드는 `build_board_vivado_project.tcl` + `board/kr260_microgpt.xdc`(Kria K26, Zynq
 UltraScale+). Kria는 PL 오실레이터 핀이 없어 `clk_100`은 PS `pl_clk0`에서 공급되며, 온보드
-스위치/LED/LCD/로터리가 없으므로 캐리어(KR260) Pmod/확장에 핀을 매핑해야 함.
+스위치/LED/LCD/로터리가 없으므로 28개 주변장치 신호를 KR260 SOM240 사용자 PL I/O
+(SOM240_1 뱅크 45 + SOM240_2 뱅크 43, `LVCMOS18`)에 KR260 I/O 맵의 실제 `xck26-sfvc784`
+볼로 배정함 — 해당 SOM240 핀(캐리어의 Pmod/라즈베리파이 40핀 헤더로 노출)에 배선.
