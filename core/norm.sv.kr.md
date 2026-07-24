@@ -1,8 +1,8 @@
-# `norm.v` 분석
+# `norm.sv` 분석
 
 ## 개요
 
-`norm.v`는 **RMSNorm 엔진**입니다:
+`norm.sv`는 **RMSNorm 엔진**입니다:
 `y[i] = sat16(sat16(x[i]·scale >> FRAC) · gain[i] >> FRAC)`,
 `scale = min(2^(2·FRAC) / isqrt(sum(x²)/N), 32767)`.
 Python 레퍼런스(`tools/fixedpoint.rmsnorm`)와 비트 단위로 일치합니다.
@@ -47,4 +47,4 @@ flowchart TB
 
 ## RTL과의 관계
 `microgpt_core`가 `OP_NORM`에서 3회 호출(norm1/norm2/norm_f, gsel로 게인 선택). `grom`이 게인,
-`udiv`/`isqrt`가 산술 프리미티브 공급. `tb_norm.v`가 Python 레퍼런스와 검증.
+`udiv`/`isqrt`가 산술 프리미티브 공급. `tb_norm.sv`가 Python 레퍼런스와 검증.

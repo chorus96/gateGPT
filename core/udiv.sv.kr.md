@@ -1,8 +1,8 @@
-# `udiv.v` 분석
+# `udiv.sv` 분석
 
 ## 개요
 
-`udiv.v`는 **부호 없는 반복 나눗셈기**입니다: `quo = num / den`(floor), W비트.
+`udiv.sv`는 **부호 없는 반복 나눗셈기**입니다: `quo = num / den`(floor), W비트.
 **Radix-4 복원(restoring), MSB 우선, 사이클당 몫 2비트** → W/2 사이클(W는 짝수).
 `den == 0`이면 all-ones(가드). RMSNorm(`ss/N`, `2²²/r`)과 어텐션(가중합/softmax-합)이 공유하며,
 샘플러는 `rem_out`(나머지)을 사용. radix-2 나눗셈기와 비트 동일한 floor 몫/나머지를 절반 사이클에 생성.
@@ -41,4 +41,4 @@ flowchart TB
 
 ## RTL과의 관계
 `norm`(2회), `attn`(HEAD_DIM개 병렬 인스턴스), `sampler`(모듈로)가 사용. 스테이지 5에서
-radix-2 → radix-4로 전환해 51,914 tok/s 달성. `tb_mathops.v`가 검증.
+radix-2 → radix-4로 전환해 51,914 tok/s 달성. `tb_mathops.sv`가 검증.

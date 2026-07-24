@@ -1,8 +1,8 @@
-# `embed.v` 분석
+# `embed.sv` 분석
 
 ## 개요
 
-`embed.v`는 **임베딩 조회**입니다:
+`embed.sv`는 **임베딩 조회**입니다:
 `emb[i] = sat16(tok_embed[token][i] + pos_embed[pos][i])`, i = 0..N_EMBED-1을
 `vmem[dst_base+i]`에 씁니다. 토큰/위치 임베딩 ROM은 Q5.11.
 

@@ -1,8 +1,8 @@
-# `sampler.v` 분석
+# `sampler.sv` 분석
 
 ## 개요
 
-`sampler.v`는 **토큰 샘플러**입니다. vmem에서 VOCAB개 logits를 읽습니다(등록 읽기 → read-ahead).
+`sampler.sv`는 **토큰 샘플러**입니다. vmem에서 VOCAB개 logits를 읽습니다(등록 읽기 → read-ahead).
 - `sample_mode=0` → **argmax**(그리디).
 - `sample_mode=1` → **온도 softmax 범주형**: `scaled = logit/temp`, max+exp+sum으로 softmax,
   `r = LCG(rng) mod total`을 뽑아 누적 합이 처음으로 r을 초과하는 토큰을 선택.
@@ -45,4 +45,4 @@ flowchart TB
 
 ## RTL과의 관계
 `microgpt_core`가 `OP_SAMPLE`에서 호출. `exp_unit`, `udiv`에 의존. 그리디/샘플 모두
-Python `generate`와 비트 일치해야 하며, `tb_core.v`가 greedy `alaya`, sampled `rosphod`로 검증.
+Python `generate`와 비트 일치해야 하며, `tb_core.sv`가 greedy `alaya`, sampled `rosphod`로 검증.

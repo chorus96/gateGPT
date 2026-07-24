@@ -1,8 +1,8 @@
-# `tb_top.v` 분석
+# `tb_top.sv` 분석
 
 ## 개요
 
-`tb_top.v`는 **보드 최상위(TOP) 테스트벤치**입니다 — `xupv5_microgpt_top` 전체(클럭 합성 →
+`tb_top.sv`는 **보드 최상위(TOP) 테스트벤치**입니다 — `xupv5_microgpt_top` 전체(클럭 합성 →
 리셋/버튼 디바운스 → 로터리 스로틀 → 이름 생성기(코어) → HD44780 LCD → 초당 토큰 미터)를
 Xilinx UniSim 라이브러리 없이 Verilator/iverilog에서 시뮬레이션합니다.
 
@@ -20,7 +20,7 @@ flowchart TB
         direction TB
         DCM["DCM stub"] --> CORE["로터리→코어→LCD→미터"]
     end
-    STUBS[["sim/xilinx_stubs.v<br/>IBUFG/BUFG/DCM_BASE"]] -.-> DUT
+    STUBS[["sim/xilinx_stubs.sv<br/>IBUFG/BUFG/DCM_BASE"]] -.-> DUT
 
     START(["initial 시작"]) --> RST["리셋 펄스 해제"]
     RST --> WLOCK["wait(dut.dcm_locked)"]
@@ -68,6 +68,6 @@ TOP PASS: board booted (DCM locked, LCD driving) and generated a name
 ```
 
 ## RTL과의 관계
-`xupv5_microgpt_top`과 `sim/xilinx_stubs.v`(Xilinx 프리미티브 stub)를 함께 사용. 보드 전체가
+`xupv5_microgpt_top`과 `sim/xilinx_stubs.sv`(Xilinx 프리미티브 stub)를 함께 사용. 보드 전체가
 통합 동작(DCM lock, LCD 구동, 코어 자기생성)함을 검증. `make -C sim tb_top`으로 실행하며,
 상세 안내는 `sim/verilator.kr.md` 참조.

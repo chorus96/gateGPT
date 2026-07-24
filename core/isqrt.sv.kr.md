@@ -1,8 +1,8 @@
-# `isqrt.v` 분석
+# `isqrt.sv` 분석
 
 ## 개요
 
-`isqrt.v`는 **부호 없는 정수 제곱근**입니다: `root = floor(sqrt(radicand))`,
+`isqrt.sv`는 **부호 없는 정수 제곱근**입니다: `root = floor(sqrt(radicand))`,
 W비트 radicand → W/2비트 root. 고전적 비트-페어(비복원, non-restoring) 알고리즘, W/2 사이클.
 Python `math.isqrt`와 일치. RMSNorm이 사용하며 합성 가능.
 
@@ -40,4 +40,4 @@ flowchart TB
 
 ## RTL과의 관계
 `norm`이 `mean_sq`의 제곱근에 사용(RMSNorm의 역제곱근 계산). 스테이지 6에서 32비트로 좁혀
-자원을 절감. `tb_mathops.v`가 Python `math.isqrt` 값과 검증.
+자원을 절감. `tb_mathops.sv`가 Python `math.isqrt` 값과 검증.

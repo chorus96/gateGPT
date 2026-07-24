@@ -1,8 +1,8 @@
-# `microgpt_core.v` 분석
+# `microgpt_core.sv` 분석
 
 ## 개요
 
-`microgpt_core.v`는 독립적인 microGPT 추론 코어 — **모듈형 데이터패스 액추에이터를 구동하는
+`microgpt_core.sv`는 독립적인 microGPT 추론 코어 — **모듈형 데이터패스 액추에이터를 구동하는
 마이크로코드-ROM 시퀀서**입니다. 프로그램 ROM(`generated/ucode.hex`)이 스케줄을 매크로 연산으로
 담고, 시퀀서가 매 스텝마다 하나를 페치해 해당 액추에이터를 시작하고 `done`을 기다립니다.
 
@@ -63,4 +63,4 @@ flowchart TB
 
 ## RTL과의 관계
 이 모듈이 코어의 최상위이며, `name_generator`가 이를 감싸 자기회귀 생성 루프를 구동합니다.
-`tb_core.v`가 전체 경로를 Python 골든과 비교합니다.
+`tb_core.sv`가 전체 경로를 Python 골든과 비교합니다.

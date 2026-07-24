@@ -1,8 +1,8 @@
-# `tb_mathops.v` 분석
+# `tb_mathops.sv` 분석
 
 ## 개요
 
-`tb_mathops.v`는 **`udiv`와 `isqrt` 유닛 테스트**입니다(Python 레퍼런스 값 대비).
+`tb_mathops.sv`는 **`udiv`와 `isqrt` 유닛 테스트**입니다(Python 레퍼런스 값 대비).
 
 ## 블록 다이어그램
 

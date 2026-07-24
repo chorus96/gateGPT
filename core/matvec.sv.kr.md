@@ -1,8 +1,8 @@
-# `matvec.v` 분석
+# `matvec.sv` 분석
 
 ## 개요
 
-`matvec.v`는 **병렬 행렬-벡터 엔진**입니다:
+`matvec.sv`는 **병렬 행렬-벡터 엔진**입니다:
 `out[o] = sat16((Σᵢ act[act_base+i] · W[sel][o,i]) >>> descale)`, o = 0..out_dim-1을
 `vmem[dst_base+o]`에 씁니다.
 
@@ -58,4 +58,4 @@ flowchart TB
 
 ## RTL과의 관계
 `microgpt_core`가 wq/wk/wv/wo/fc1/fc2/lm 프로젝션마다 호출. `wrom`이 타일 가중치를 공급.
-`tb_matvec.v`가 wq 결과를 Python 레퍼런스와 검증. DSP 사용의 대부분(48/62)을 차지하는 바인딩 리소스.
+`tb_matvec.sv`가 wq 결과를 Python 레퍼런스와 검증. DSP 사용의 대부분(48/62)을 차지하는 바인딩 리소스.

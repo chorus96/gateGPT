@@ -1,8 +1,8 @@
-# `wrom.v` 분석
+# `wrom.sv` 분석
 
 ## 개요
 
-`wrom.v`는 24-레인, 2열/사이클 병렬 matvec 엔진을 위한 **와이드 가중치 ROM**입니다.
+`wrom.sv`는 24-레인, 2열/사이클 병렬 matvec 엔진을 위한 **와이드 가중치 ROM**입니다.
 각 워드는 연속된 **두 입력 열**(하위 절반 = 열 2j, 상위 절반 = 열 2j+1)에 대한 LANES=24개
 Q5.11 가중치를 담으며, `tile*(in_dim/2) + j`로 주소 지정됩니다.
 `wdata[lane*16 +:16]`은 열 2j, `wdata[LANES*16 + lane*16 +:16]`은 열 2j+1의 가중치입니다.
@@ -33,4 +33,4 @@ flowchart LR
 
 ## RTL과의 관계
 `matvec`이 `w_addr`로 조회하고 `w_rdata`를 받음. `wrom_data.vh`는 `export.py`가 생성.
-`tb_matvec.v`에서 WQ(sel=0)로 인스턴스화되어 검증.
+`tb_matvec.sv`에서 WQ(sel=0)로 인스턴스화되어 검증.

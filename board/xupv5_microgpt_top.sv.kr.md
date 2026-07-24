@@ -1,8 +1,8 @@
-# `xupv5_microgpt_top.v` 분석
+# `xupv5_microgpt_top.sv` 분석
 
 ## 개요
 
-`xupv5_microgpt_top.v`는 microGPT 이름 생성기를 위한 **XUPV5(Virtex-5 XC5VLX110T) 보드 최상위**입니다.
+`xupv5_microgpt_top.sv`는 microGPT 이름 생성기를 위한 **XUPV5(Virtex-5 XC5VLX110T) 보드 최상위**입니다.
 
 데모: 이름이 16×2 LCD에 자동으로 순환합니다. **로터리 엔코더**가 두 설정 중 하나를 조정하며,
 **누르기**로 선택합니다: RATE(회전 속도, 1 Hz ~ 연속) 또는 TEMP(샘플링 온도, T=0.5..1.2).

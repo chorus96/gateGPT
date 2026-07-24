@@ -1,8 +1,8 @@
-# `xilinx_stubs.v` 분석
+# `xilinx_stubs.sv` 분석
 
 ## 개요
 
-`xilinx_stubs.v`는 `xupv5_microgpt_top`이 사용하는 Virtex-5 클럭 프리미티브(`IBUFG`, `BUFG`,
+`xilinx_stubs.sv`는 `xupv5_microgpt_top`이 사용하는 Virtex-5 클럭 프리미티브(`IBUFG`, `BUFG`,
 `DCM_BASE`)의 **동작 모델(behavioral stub)**입니다. Verilator/iverilog에는 Xilinx UniSim 라이브러리가
 없으므로, 이 파일로 보드 최상위를 UniSim 없이 시뮬레이션할 수 있습니다.
 
@@ -58,6 +58,6 @@ flowchart LR
 - **비동기 리셋 lock**: `RST` 상승에서 즉시 unlock, 해제 후 카운터로 재lock.
 
 ## RTL과의 관계
-`tb_top.v`가 `xupv5_microgpt_top`과 함께 컴파일하여 TOP의 `IBUFG`/`BUFG`/`DCM_BASE` 인스턴스를
+`tb_top.sv`가 `xupv5_microgpt_top`과 함께 컴파일하여 TOP의 `IBUFG`/`BUFG`/`DCM_BASE` 인스턴스를
 해석. TOP의 클럭 트리(100 MHz → DCM → 코어 클럭)와 `dcm_locked` 게이트가 시뮬레이션에서 동작하도록 함.
 `make -C sim tb_top`에서 사용.

@@ -1,8 +1,8 @@
-# `exp_unit.v` 분석
+# `exp_unit.sv` 분석
 
 ## 개요
 
-`exp_unit.v`는 z ≤ 0에 대한 **고정소수점 exp**입니다:
+`exp_unit.sv`는 z ≤ 0에 대한 **고정소수점 exp**입니다:
 `e = round(exp(z/2048) · 2048)` ∈ [0, 2048], **17개 항목 테이블**(exp(-k)) + **선형 보간**.
 `tools/fixedpoint.exp_neg_q11`과 비트 단위로 일치. (z ≥ 0이면 2048 = exp(0) 반환.)
 
@@ -42,4 +42,4 @@ flowchart LR
 
 ## RTL과의 관계
 `attn`(softmax)과 `sampler`(온도 softmax)가 인스턴스화. `exp_data.vh`는 `export.py`가 생성.
-`tb_exp.v`가 z 스윕으로 Python 레퍼런스와 검증.
+`tb_exp.sv`가 z 스윕으로 Python 레퍼런스와 검증.

@@ -1,8 +1,8 @@
-# `tb_exp.v` 분석
+# `tb_exp.sv` 분석
 
 ## 개요
 
-`tb_exp.v`는 **`exp_unit` 유닛 테스트**입니다(Python 레퍼런스 대비, z 값 스윕).
+`tb_exp.sv`는 **`exp_unit` 유닛 테스트**입니다(Python 레퍼런스 대비, z 값 스윕).
 
 ## 블록 다이어그램
 

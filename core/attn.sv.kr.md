@@ -1,8 +1,8 @@
-# `attn.v` 분석
+# `attn.sv` 분석
 
 ## 개요
 
-`attn.v`는 **단일 위치 멀티헤드 어텐션** 엔진으로, 등록된 vmem 읽기(1사이클 지연, read-ahead)를 사용합니다.
+`attn.sv`는 **단일 위치 멀티헤드 어텐션** 엔진으로, 등록된 vmem 읽기(1사이클 지연, read-ahead)를 사용합니다.
 헤드마다: 쿼리 슬라이스 로드 → `score = scale·(q·k)` → max-차감 + exp + sum으로 softmax →
 `output = Σ(e·v)/Σe`(절삭 나눗셈).
 
@@ -54,5 +54,5 @@ flowchart TB
 
 ## RTL과의 관계
 `microgpt_core`가 `OP_ATTN`에서 호출(ctx_len = pos+1). `exp_unit`, `udiv` 프리미티브에 의존.
-`tb_attn.v`가 `.saa` 컨텍스트로 Python 레퍼런스와 검증. 병렬 나눗셈기가 스테이지 4의
+`tb_attn.sv`가 `.saa` 컨텍스트로 Python 레퍼런스와 검증. 병렬 나눗셈기가 스테이지 4의
 44,919 tok/s 성과의 핵심.

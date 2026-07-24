@@ -1,8 +1,8 @@
-# `rotary_throttle.v` 분석
+# `rotary_throttle.sv` 분석
 
 ## 개요
 
-`rotary_throttle.v`는 이름 생성기용 **로터리 엔코더 제어**입니다(Panasonic EVQWK4001, 15 디텐트).
+`rotary_throttle.sv`는 이름 생성기용 **로터리 엔코더 제어**입니다(Panasonic EVQWK4001, 15 디텐트).
 엔코더를 돌리면 푸시 버튼으로 선택된 두 설정 중 하나를 조정합니다:
 - `cfg_mode = 0` (RATE): 레벨 0..MAX_LEVEL이 자동 회전 간격을 설정(1 Hz에서 연속까지 지수적으로).
 - `cfg_mode = 1` (TEMP): 레벨 0..NTEMP-1이 샘플링 온도를 선택.

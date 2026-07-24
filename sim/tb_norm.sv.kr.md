@@ -1,8 +1,8 @@
-# `tb_norm.v` 분석
+# `tb_norm.sv` 분석
 
 ## 개요
 
-`tb_norm.v`는 **RMSNorm 엔진 유닛 테스트**입니다(Python 고정소수점 레퍼런스 대비, 듀얼 포트 vmem).
+`tb_norm.sv`는 **RMSNorm 엔진 유닛 테스트**입니다(Python 고정소수점 레퍼런스 대비, 듀얼 포트 vmem).
 
 ## 블록 다이어그램
 

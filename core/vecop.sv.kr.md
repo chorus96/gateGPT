@@ -1,8 +1,8 @@
-# `vecop.v` 분석
+# `vecop.sv` 분석
 
 ## 개요
 
-`vecop.v`는 vmem 상의 **원소별 벡터 연산**입니다(등록 읽기 → read-ahead):
+`vecop.sv`는 vmem 상의 **원소별 벡터 연산**입니다(등록 읽기 → read-ahead):
 - `op=0` **ADD**: `dst[i] = sat16(a[i] + b[i])` (잔차 덧셈)
 - `op=1` **RELU**: `dst[i] = max(0, a[i])` (MLP 활성화)
 
